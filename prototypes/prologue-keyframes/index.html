@@ -1,0 +1,95 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>序言样片 关键帧</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;500&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* Layout: a film contact sheet — one full-width frame per shot, slate line above, notes beside on desktop, below on phone */
+:root {
+  --bg: #0B0A09; --surface: #15130F; --fg: #E9E1D2; --muted: #9A9083; --line: #2A2620; --warm: #DBC299; --cool: #8FB7C4;
+  --serif: "Noto Serif TC", "Noto Serif CJK TC", "Songti TC", serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--serif); font-weight: 300; line-height: 1.7;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 40px 72px; display: grid; gap: 56px; }
+header { display: grid; gap: 10px; }
+.slate { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { font-weight: 500; font-size: clamp(26px, 4vw, 38px); margin: 0; letter-spacing: .04em; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 62ch; margin: 0; }
+.shot { display: grid; gap: 14px; }
+.shot .head { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; border-top: 1px solid var(--line); padding-top: 14px; }
+.shot .id { font-family: var(--mono); color: var(--warm); font-size: 13px; letter-spacing: .1em; }
+.shot h2 { margin: 0; font-weight: 500; font-size: 20px; letter-spacing: .06em; }
+.shot .tc { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.frame { display: block; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; background: #000; object-fit: cover; }
+.body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.body > div { min-width: 0; }
+.label { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.cap { margin: 0; font-size: 15px; }
+ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: 14px; }
+.todo li::marker { color: var(--cool); }
+footer { border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 14px; display: grid; gap: 6px; }
+code { font-family: var(--mono); font-size: 12.5px; color: var(--warm); }
+@media (max-width: 720px) { .body { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="slate">《摧毀只是一瞬間》 · 序言 · 样片 V0.2 · 关键帧</div>
+    <h1>地球弧光贯穿四镜</h1>
+    <p class="lede">原文第一段五句，每句一个镜头。全部由同一份代码按时间 t 渲染：1920×1080，ACES 色调，辉光，胶片颗粒。V0.2 把地球的弧形辉光加进 S1、S2、S3、S5，景别从远到近；S3 改为俯拍半透明船舱。确认后再做 52 秒动态视频和交互版。</p>
+  </header>
+
+  <section class="shot">
+    <div class="head"><span class="id">S1</span><h2>冷开场</h2><span class="tc">00:00–00:08 · 帧 t=5.0</span></div>
+    <img class="frame" src="s_5.jpg" alt="深空中散落的三千个暖白光点">
+    <div class="body">
+      <div><div class="label">字幕</div><p class="cap">一萬年前，同領地(Domain)三千名隊員是如何被瞬間捕捉的？</p></div>
+      <div><div class="label">待改</div><ul class="todo"><li>新增：远景地球雏形，暗面朝向镜头，上缘一道半圆辉光</li><li>待改：远处光点的辉光略呈方形</li></ul></div>
+    </div>
+  </section>
+
+  <section class="shot">
+    <div class="head"><span class="id">S2</span><h2>降临</h2><span class="tc">00:08–00:22 · 帧 t=18.5</span></div>
+    <img class="frame" src="s_18_5.jpg" alt="黑色飞船压向光点方阵，船底一道暖白灯带">
+    <div class="body">
+      <div><div class="label">字幕</div><p class="cap">當時為了執行物質界的任務，能夠與物質界互動，三千靈魂都穿上了物質身體的衣服，乘坐飛船進入地球。</p></div>
+      <div><div class="label">待改</div><ul class="todo"><li>新增：地球近一级，只露一段大弧线，横在画面下缘</li><li>待改：飞船还是圆角盒，体量感要加</li></ul></div>
+    </div>
+  </section>
+
+  <section class="shot">
+    <div class="head"><span class="id">S3</span><h2>船舱</h2><span class="tc">00:22–00:32 · 帧 t=28.0</span></div>
+    <img class="frame" src="s_28.jpg" alt="三层回廊上站满半透明人形，胸口光点亮度不一">
+    <div class="body">
+      <div><div class="label">字幕</div><p class="cap">當時三千名靈魂的意識強度，大約三分之一在 9 以下，大約三分之二在 9 以上（包含大約三分之一在 13 以上）。</p></div>
+      <div><div class="label">待改</div><ul class="todo"><li>新增：从拱顶俯拍，回廊和船底是半透明的「雏形」结构，中间一道透光缝，下面看到地球弧光</li><li>待定：船舱的雏形风格等你的参考图</li></ul></div>
+    </div>
+  </section>
+
+  <section class="shot">
+    <div class="head"><span class="id">S4</span><h2>弱点</h2><span class="tc">00:32–00:42 · 帧 t=38.0</span></div>
+    <img class="frame" src="s_38.jpg" alt="半透明人形近景，胸口的光与身体内壁之间连着细丝">
+    <div class="body">
+      <div><div class="label">字幕</div><p class="cap">靈魂穿上物質身體的衣服時，連接身體的意識，會受到身體狀態的影響。</p></div>
+      <div><div class="label">待改</div><ul class="todo"><li>不变（这一镜不加地球）</li><li>待改：丝线更细更弯，像蛛丝</li></ul></div>
+    </div>
+  </section>
+
+  <section class="shot">
+    <div class="head"><span class="id">S5</span><h2>注视</h2><span class="tc">00:42–00:52 · 帧 t=49.0</span></div>
+    <img class="frame" src="s_49.jpg" alt="雾海之下、地球弧线之上，T 组之眼的冷色光环伸出丝线连向飞船">
+    <div class="body">
+      <div><div class="label">字幕</div><p class="cap">T 組(BOTS)暗中觀察到了這個情況，準備利用這一點，策劃了一個瞬間催眠的偷襲計畫。</p></div>
+      <div><div class="label">待改</div><ul class="todo"><li>优化：地球弧光提亮；雾海加沙粒颗粒；船体接缝更清楚；眼加两道淡的折射环；锁定丝线更弯更淡</li><li>待改：雾海颗粒在远景里还不够明显</li></ul></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="slate">管线</div>
+    <div><code>scene.html</code> 暴露 <code>seek(t)</code> → 无头 Chrome 逐帧截图 → ffmpeg 合成。随机数固定 seed，同一个 t 永远出同一帧。</div>
+  </footer>
+</div>
+
+</body></html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>光学画廊 M0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* full-bleed shader stage; UI is thin translucent chrome on top */
+  --ink:#06080c;
+  --glass:rgba(8,11,16,.62);
+  --line:rgba(150,200,230,.18);
+  --text:#e8edf2;
+  --muted:#93a0ae;
+  --accent:#7fe0ff;
+  --f-ui:"JetBrains Mono","PingFang SC","Noto Sans SC",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--text);font-family:var(--f-ui);font-size:13px;overflow:hidden}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.top{position:fixed;top:16px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none}
+.brand{pointer-events:auto}
+.brand h1{font-size:15px;font-weight:500;margin:0;letter-spacing:.04em}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.seg{pointer-events:auto;display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--glass)}
+.seg button{font:inherit;font-size:12px;color:var(--muted);background:transparent;border:0;padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{color:var(--ink);background:var(--accent)}
+.bottom{position:fixed;left:16px;right:16px;bottom:16px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;pointer-events:none}
+.cap{pointer-events:auto;background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:12px 14px;max-width:420px;display:grid;gap:6px}
+.cap .k{font-size:11px;color:var(--accent);letter-spacing:.08em}
+.cap .t{font-size:15px;font-weight:500}
+.cap .d{color:var(--muted);line-height:1.6}
+.act{font:inherit;font-size:12px;justify-self:start;color:var(--ink);background:var(--accent);border:0;border-radius:5px;padding:6px 12px;cursor:pointer}
+.act[hidden]{display:none}
+.nav{pointer-events:auto;display:flex;gap:4px;background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:4px}
+.nav button{font:inherit;font-size:12px;color:var(--muted);background:transparent;border:0;border-radius:5px;padding:6px 10px;cursor:pointer}
+.nav button:hover{color:var(--text)}
+.nav button[aria-current="true"]{color:var(--text);background:rgba(127,224,255,.14)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.q{position:fixed;right:16px;top:56px;font-size:11px;color:var(--muted);pointer-events:none;font-variant-numeric:tabular-nums}
+.err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--muted)}
+@media (max-width:640px){.cap{max-width:none;width:100%}.nav{width:100%;justify-content:space-between}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="光学画廊三维场景"></canvas>
+<div class="top">
+  <div class="brand"><h1>光学画廊 · M0</h1><p>《摧毀只是一瞬間》原型 · 场景全部由数学公式生成</p></div>
+  <div class="seg" role="group" aria-label="风格">
+    <button id="sLab" aria-pressed="true">外星实验室</button>
+    <button id="sGal" aria-pressed="false">古典画廊</button>
+  </div>
+</div>
+<div class="q" id="q"></div>
+<div class="bottom">
+  <div class="cap" aria-live="polite">
+    <span class="k" id="ck"></span>
+    <span class="t" id="ct"></span>
+    <span class="d" id="cd"></span>
+    <button class="act" id="act"></button>
+  </div>
+  <nav class="nav" aria-label="节点">
+    <button data-n="entry">入口</button>
+    <button data-n="hall">展厅</button>
+    <button data-n="a">章节 A</button>
+    <button data-n="b">章节 B</button>
+    <button data-n="c">章节 C</button>
+  </nav>
+</div>
+<div class="err" id="err">这个浏览器没有开启 WebGL，场景无法显示。请换用新版 Chrome、Safari 或 Edge。</div>
+
+<script id="fsScene" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 R;uniform float T;uniform vec3 uRo,uTa;uniform float uLab,uEnter,uPortal,uFocal;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+vec2 h2(vec2 p){return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p*=2.;a*=.5;}return v;}
+vec2 vor(vec2 x){vec2 i=floor(x),f=fract(x);float f1=8.,f2=8.;for(int y=-1;y<=1;y++)for(int k=-1;k<=1;k++){vec2 g=vec2(float(k),float(y));vec2 o=h2(i+g);o=.5+.4*sin(T*.6+6.2832*o);float d=length(g+o-f);if(d<f1){f2=f1;f1=d;}else if(d<f2)f2=d;}return vec2(f1,f2);}
+
+float occG(vec2 p){float a=atan(p.y,p.x),r=length(p);return step(.22,r)*step(r,.5)*step(.15,sin(a*7.+T*.4+r*6.));}
+float litG(vec2 p){return smoothstep(.55,0.,length(p))*(1.-occG(p));}
+vec3 eGod(vec2 uv){vec2 d=uv/48.,p=uv;float acc=0.,w=1.;for(int i=0;i<48;i++){acc+=litG(p)*w;w*=.965;p-=d;}
+ vec3 col=vec3(1.,.8,.55)*acc*.06;col=mix(col,vec3(.03,.02,.02),occG(uv)*.85);col+=vec3(1.,.9,.7)*smoothstep(.2,0.,length(uv))*.6;return 1.-exp(-col*1.5);}
+vec3 eDis(vec2 uv){float r=length(uv);float nn=fbm(uv*3.5);float th=.5+.45*sin(T*.5);float ins=smoothstep(.75,.73,r);
+ float m=step(th,nn)*ins;vec2 v=vor(uv*5.);float cr=1.-smoothstep(0.,.03,v.y-v.x);vec3 surf=vec3(.75,.72,.68)*(.6+.4*fbm(uv*8.));surf*=1.-cr*.7;
+ vec3 col=mix(vec3(.02,.02,.03),surf,m);col+=vec3(1.,.45,.1)*smoothstep(.05,0.,abs(nn-th))*ins*1.5;return col;}
+vec3 eBh(vec2 uv){float r=length(uv);vec2 q=uv*(1.-.06/(r*r+.001));vec2 sq=q*1.5+vec2(T*.03,0.);
+ vec3 col=vec3(step(.992,h(floor(sq*50.)))*.9)+vec3(.15,.08,.25)*fbm(sq*2.)*1.2;
+ vec2 e=vec2(uv.x,uv.y*4.);float er=length(e);float disk=exp(-pow((er-.55)/.18,2.))*(1.+.7*uv.x/max(r,.01))*(.7+.3*n(vec2(atan(e.y,e.x)*6.-T*2.,er*10.)));
+ vec3 dc=vec3(1.,.55,.2)*disk*.9;if(uv.y>0.)col+=dc;col*=smoothstep(.19,.21,r);if(uv.y<=0.)col+=dc;
+ col+=vec3(1.,.6,.25)*exp(-pow((r-.24)/.02,2.))*.8*(.6+.4*sin(atan(uv.y,uv.x)+T));col+=vec3(1.,.8,.6)*exp(-pow((r-.205)/.006,2.))*.6;return 1.-exp(-col*1.4);}
+vec3 eff(float i,vec2 uv){if(i<.5)return eGod(uv);if(i<1.5)return eDis(uv);return eBh(uv);}
+vec3 portalCol(float i){if(i<.5)return vec3(1.,.78,.5);if(i<1.5)return vec3(1.,.5,.25)*.8;return vec3(.95,.55,.4);}
+
+float sdBox2(vec2 p,vec2 b){vec2 d=abs(p)-b;return length(max(d,0.))+min(max(d.x,d.y),0.);}
+float archHole(vec2 q){return min(sdBox2(q-vec2(0.,1.05),vec2(1.05,1.05)),length(q-vec2(0.,2.1))-1.05);}
+float cxOf(float x){return clamp(floor(x/3.2+.5),-1.,1.)*3.2;}
+vec2 map(vec3 p){
+ float cx=cxOf(p.x);float hole=archHole(vec2(p.x-cx,p.y));
+ float wall=min(max(p.z+10.,-hole),p.z+10.45);
+ float trim=max(abs(hole)-.05,abs(p.z+10.)-.07);
+ float vault=5.6-length(p.xy);
+ float rz=mod(p.z,2.5)-1.25;
+ float rib=length(vec2(length(p.xy)-5.52,rz))-.09;
+ vec2 r=vec2(p.y,1.);
+ if(vault<r.x)r=vec2(vault,2.);
+ if(rib<r.x)r=vec2(rib,3.);
+ if(wall<r.x)r=vec2(wall,4.);
+ if(trim<r.x)r=vec2(trim,5.);
+ float back=8.5-p.z;if(back<r.x)r=vec2(back,4.);
+ return r;}
+vec3 nrm(vec3 p){vec2 e=vec2(.002,0);return normalize(vec3(map(p+e.xyy).x-map(p-e.xyy).x,map(p+e.yxy).x-map(p-e.yxy).x,map(p+e.yyx).x-map(p-e.yyx).x));}
+float ao(vec3 p,vec3 nn){float o=0.,s=1.;for(int i=0;i<5;i++){float hh=.02+.12*float(i);o+=(hh-map(p+nn*hh).x)*s;s*=.75;}return clamp(1.-2.*o,0.,1.);}
+vec3 shade(vec3 p,vec3 nn,float id,float lab){
+ float cx=cxOf(p.x);
+ if(id==4.&&p.z<-10.3){vec2 q=(vec2(p.x-cx,p.y)-vec2(0.,1.6))/1.25;return eff(cx/3.2+1.,q)*1.3;}
+ vec3 base,emi=vec3(0.);
+ if(id==1.){vec2 g=abs(fract(p.xz*.5)-.5)*2.;float ln=1.-smoothstep(.0,.04,min(1.-g.x,1.-g.y));
+   base=mix(vec3(.55,.52,.48)*(.85+.15*fbm(p.xz*1.5)),vec3(.035,.04,.05),lab);emi=vec3(.1,.5,.7)*ln*lab*.4;}
+ else if(id==2.)base=mix(vec3(.82,.8,.76),vec3(.05,.06,.075),lab);
+ else if(id==3.){base=mix(vec3(.72,.7,.66),vec3(.04,.045,.06),lab);emi=vec3(.15,.7,1.)*lab*(.25+.35*(.5+.5*sin(p.z*.9+T*2.)));}
+ else if(id==5.){base=mix(vec3(.85,.62,.3),vec3(.05),lab);emi=vec3(.3,.9,1.)*lab*.9;}
+ else base=mix(vec3(.8,.78,.74),vec3(.05,.055,.07),lab);
+ vec3 L=vec3(0.);
+ for(int i=0;i<3;i++){float fi=float(i);vec3 lp=vec3((fi-1.)*3.2,1.7,-10.1);vec3 ld=lp-p;float dl=length(ld);ld/=dl;
+   L+=portalCol(fi)*(.85+.15*sin(T*1.3+fi*2.))*max(dot(nn,ld),0.)*2.4/(1.+dl*dl*.16);}
+ float a=ao(p,nn);
+ vec3 amb=mix(vec3(.33,.34,.38)*(.6+.4*nn.y),vec3(.02,.03,.05),lab);
+ vec3 key=vec3(1.,.97,.9)*max(dot(nn,normalize(vec3(.2,1.,.3))),0.)*.6*(1.-lab);
+ return base*((amb+key)*a+L)+emi;}
+vec2 march(vec3 ro,vec3 rd,float tmax,out float t){t=.02;vec2 hh=vec2(0.,-1.);for(int i=0;i<110;i++){hh=map(ro+rd*t);if(hh.x<.0015*t)return hh;t+=hh.x;if(t>tmax)break;}return vec2(0.,-1.);}
+void main(){
+ vec2 uv=(gl_FragCoord.xy*2.-R)/R.y;
+ float lab=uLab;
+ float k=smoothstep(.45,1.,uEnter)*1.2;
+ vec3 fe=vec3(0.);
+ if(uEnter>.01)fe=eff(uPortal,uv*.9);
+ if(k>1.15){gl_FragColor=vec4(fe,1.);return;}
+ vec3 f=normalize(uTa-uRo),rr=normalize(cross(f,vec3(0,1,0))),u=cross(rr,f);
+ vec3 rd=normalize(f*uFocal+uv.x*rr+uv.y*u),ro=uRo;
+ vec3 fogC=mix(vec3(.55,.55,.57),vec3(.01,.02,.03),lab);
+ float t;vec2 hit=march(ro,rd,40.,t);
+ vec3 col=fogC;
+ if(hit.y>0.){vec3 p=ro+rd*t,nn=nrm(p);col=shade(p,nn,hit.y,lab);
+   if(hit.y==1.){vec3 rn=nn;if(lab<.5)rn=normalize(nn+vec3(fbm(p.xz*6.)-.5,0.,fbm(p.xz*6.+7.)-.5)*.06);
+     vec3 r2=reflect(rd,rn);float t2;vec2 h2r=march(p+nn*.01,r2,30.,t2);vec3 rc=fogC;
+     if(h2r.y>0.){vec3 p2=p+nn*.01+r2*t2;rc=shade(p2,nrm(p2),h2r.y,lab);rc=mix(rc,fogC,1.-exp(-t2*.025));}
+     float F=.04+.96*pow(1.-max(dot(-rd,nn),0.),5.);float rf=mix(.35,.75,lab);col=col*(1.-rf*.6)+rc*rf*(.4+.6*F);}
+   col=mix(col,fogC,1.-exp(-t*.025));}
+ float th=hit.y>0.?t:40.;
+ for(int i=0;i<3;i++){float fi=float(i);vec3 lp=vec3((fi-1.)*3.2,1.7,-10.1);float t0=clamp(dot(lp-ro,rd),0.,th);float d=length(ro+rd*t0-lp);
+   col+=portalCol(fi)*exp(-d*1.1)*mix(.06,.16,lab);}
+ col=max(col,0.);col=col*(2.51*col+.03)/(col*(2.43*col+.59)+.14);col=pow(clamp(col,0.,1.),vec3(1./2.2));
+ if(uEnter>.01){float m=fbm(uv*2.5+3.7);float mask=1.-smoothstep(k-.05,k,m);float edge=exp(-abs(m-k)*50.)*step(.01,k)*step(k,1.1);
+   col=mix(col,fe,mask)+vec3(1.,.6,.3)*edge*.8;}
+ gl_FragColor=vec4(col,1.);
+}
+</script>
+<script id="fsPost" type="x-shader/x-fragment">
+precision highp float;
+uniform sampler2D S;uniform vec2 R;uniform float T,uLab;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+void main(){vec2 uv=gl_FragCoord.xy/R;vec2 c=uv-.5;float ca=mix(.004,.012,uLab)*length(c);
+ vec3 col=vec3(texture2D(S,uv-c*ca*2.).r,texture2D(S,uv).g,texture2D(S,uv+c*ca*2.).b);
+ col*=1.-mix(.35,.6,uLab)*dot(c,c)*1.6;
+ col*=1.-uLab*.05*(.5+.5*sin(gl_FragCoord.y*1.6));
+ col+=(h(gl_FragCoord.xy+fract(T)*97.)-.5)*mix(.025,.045,uLab);
+ gl_FragColor=vec4(col,1.);}
+</script>
+
+<script>
+const cv=document.getElementById('c');
+const gl=cv.getContext('webgl',{antialias:false,alpha:false});
+if(!gl){document.getElementById('err').style.display='flex'}
+const VS='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+function prog(fsId){const mk=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o};
+  const p=gl.createProgram();gl.attachShader(p,mk(gl.VERTEX_SHADER,VS));gl.attachShader(p,mk(gl.FRAGMENT_SHADER,document.getElementById(fsId).textContent));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)){document.getElementById('err').textContent='着色器编译失败，请把浏览器控制台的报错发给 Claude。';document.getElementById('err').style.display='flex'}
+  const u={};const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);for(let i=0;i<n;i++){const a=gl.getActiveUniform(p,i);u[a.name]=gl.getUniformLocation(p,a.name)}
+  return {p,u,a:gl.getAttribLocation(p,'p')}}
+let PS,PP,buf,fbo,tex,fw=0,fh=0;
+if(gl){PS=prog('fsScene');PP=prog('fsPost');buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW)}
+
+let dpr=Math.min(devicePixelRatio||1,1.5),scale=.6;
+function resize(){cv.width=Math.round(innerWidth*dpr);cv.height=Math.round(innerHeight*dpr)}
+function ensureFBO(){const w=Math.max(2,Math.round(cv.width*scale)),h=Math.max(2,Math.round(cv.height*scale));if(w===fw&&h===fh)return;fw=w;fh=h;
+  if(tex)gl.deleteTexture(tex);if(fbo)gl.deleteFramebuffer(fbo);
+  tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  fbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);gl.bindFramebuffer(gl.FRAMEBUFFER,null)}
+addEventListener('resize',resize);resize();
+
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const NODES=['entry','hall','a','b','c'];
+const PORTAL={a:0,b:1,c:2};
+const INFO={
+ entry:['入口','光学画廊','整个空间由符号距离函数（SDF）实时算出：穹顶、肋拱、三道拱门和反光地面都没有模型文件。滚动鼠标、方向键或点下方节点往里走。','进入展厅'],
+ hall:['展厅','三扇拱门，三个章节','每扇拱门里的画是一个实时运行的数学效果，也是一个入口。点画框或下方的章节按钮靠近。','走向章节 A'],
+ a:['章节 A · 示例','体积光 #god','光线穿过旋转的遮挡物散射成光束。正式内容按原文替换。','进入画中'],
+ b:['章节 B · 示例','溶解碎裂 #dis','噪声阈值溶解，余烬边缘加 Voronoi 裂纹，对应「摧毁只是一瞬间」。','进入画中'],
+ c:['章节 C · 示例','引力透镜 #bh','背景星空按透镜公式弯曲，吸积盘绕着奇点旋转。','进入画中']
+};
+const cx=i=>(i-1)*3.2;
+function camFor(node,enter){
+  if(node==='entry')return{ro:[0,1.7,7.5],ta:[0,1.6,-10]};
+  if(node==='hall')return{ro:[0,1.7,-1.5],ta:[0,1.75,-10]};
+  const x=cx(PORTAL[node]);
+  return enter?{ro:[x,1.62,-9.35],ta:[x,1.62,-10.45]}:{ro:[x,1.62,-6.6],ta:[x,1.62,-10.45]};
+}
+const S={ro:[0,1.7,7.5],ta:[0,1.6,-10],enter:0,lab:1};
+let tw=null,node='entry',entered=false,portal=0;
+const ease=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+function tweenTo(tg,dur){if(reduce)dur=Math.min(dur,.25);const from={ro:[...S.ro],ta:[...S.ta],enter:S.enter,lab:S.lab};tw={from,tg,t0:performance.now(),dur:dur*1000}}
+function stepTween(now){if(!tw)return;let k=Math.min(1,(now-tw.t0)/tw.dur),e=ease(k);
+  for(let i=0;i<3;i++){S.ro[i]=tw.from.ro[i]+(tw.tg.ro[i]-tw.from.ro[i])*e;S.ta[i]=tw.from.ta[i]+(tw.tg.ta[i]-tw.from.ta[i])*e}
+  S.enter=tw.from.enter+(tw.tg.enter-tw.from.enter)*(tw.tg.enter>tw.from.enter?Math.max(0,(k-.35)/.65):e);
+  S.lab=tw.from.lab+(tw.tg.lab-tw.from.lab)*e;if(k>=1)tw=null}
+let labTarget=1;
+function go(n){node=n;entered=false;if(n in PORTAL)portal=PORTAL[n];const c=camFor(n,false);tweenTo({...c,enter:0,lab:labTarget},S.enter>.5?1.6:1.8);ui()}
+function enter(){if(!(node in PORTAL))return;entered=true;portal=PORTAL[node];const c=camFor(node,true);tweenTo({...c,enter:1,lab:labTarget},2);ui()}
+function exitPortal(){if(!entered)return;go(node)}
+function setStyle(lab){labTarget=lab;document.getElementById('sLab').setAttribute('aria-pressed',lab?'true':'false');document.getElementById('sGal').setAttribute('aria-pressed',lab?'false':'true');
+  tweenTo({ro:tw?tw.tg.ro:[...S.ro],ta:tw?tw.tg.ta:[...S.ta],enter:tw?tw.tg.enter:S.enter,lab},1.2)}
+function ui(){const [k,t,d,a]=INFO[node];
+  document.getElementById('ck').textContent=entered?k+' · 画中':k;
+  document.getElementById('ct').textContent=t;
+  document.getElementById('cd').textContent=entered?'你已经进入这幅画的世界。效果全屏实时运行，之后这里会接上这一章的原文和互动。':d;
+  const act=document.getElementById('act');act.textContent=entered?'返回展厅':a;
+  document.querySelectorAll('.nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.n===node?'true':'false'));
+  try{history.replaceState(null,'','#'+node)}catch(e){}}
+document.getElementById('act').addEventListener('click',()=>{if(entered){exitPortal();return}
+  if(node==='entry')go('hall');else if(node==='hall')go('a');else enter()});
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.n)));
+document.getElementById('sLab').addEventListener('click',()=>setStyle(1));
+document.getElementById('sGal').addEventListener('click',()=>setStyle(0));
+function step(dir){if(entered){if(dir<0)exitPortal();return}const i=NODES.indexOf(node),j=Math.max(0,Math.min(NODES.length-1,i+dir));if(j!==i)go(NODES[j])}
+let lastWheel=0;
+cv.addEventListener('wheel',e=>{e.preventDefault();const now=performance.now();if(now-lastWheel<900)return;lastWheel=now;step(e.deltaY>0?1:-1)},{passive:false});
+let ty=null;cv.addEventListener('touchstart',e=>{ty=e.touches[0].clientY},{passive:true});
+cv.addEventListener('touchend',e=>{if(ty===null)return;const dy=ty-e.changedTouches[0].clientY;ty=null;if(Math.abs(dy)>40)step(dy>0?1:-1)},{passive:true});
+addEventListener('keydown',e=>{if(e.target.tagName==='BUTTON'&&(e.key==='Enter'||e.key===' '))return;
+  if(e.key==='ArrowDown'||e.key==='ArrowRight'){e.preventDefault();step(1)}
+  else if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();step(-1)}
+  else if(e.key==='Enter'){if(node in PORTAL&&!entered)enter()}
+  else if(e.key==='Escape'){if(entered)exitPortal();else if(node in PORTAL)go('hall')}});
+
+function norm(v){const l=Math.hypot(...v);return v.map(x=>x/l)}
+function cross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]}
+function archHole(x,y){const bx=Math.abs(x)-1.05,by=Math.abs(y-1.05)-1.05;const box=Math.hypot(Math.max(bx,0),Math.max(by,0))+Math.min(Math.max(bx,by),0);return Math.min(box,Math.hypot(x,y-2.1)-1.05)}
+function focalNow(){const a=cv.width/cv.height;return 1.6*Math.min(1,a*1.15)}
+function pick(clientX,clientY){const r=cv.getBoundingClientRect(),W=r.width,H=r.height;const ux=((clientX-r.left)*2-W)/H,uy=((H-(clientY-r.top))*2-H)/H;
+  const f=norm(S.ta.map((v,i)=>v-S.ro[i])),rr=norm(cross(f,[0,1,0])),u=cross(rr,f),F=focalNow();
+  const rd=norm([0,1,2].map(i=>f[i]*F+ux*rr[i]+uy*u[i]));if(rd[2]>=0)return -1;const t=(-10-S.ro[2])/rd[2];
+  const px=S.ro[0]+rd[0]*t,py=S.ro[1]+rd[1]*t;const i=Math.max(-1,Math.min(1,Math.round(px/3.2)));return archHole(px-i*3.2,py)<0?i+1:-1}
+cv.addEventListener('click',e=>{if(entered)return;const i=pick(e.clientX,e.clientY);if(i<0)return;const n=['a','b','c'][i];if(node===n)enter();else go(n)});
+cv.addEventListener('mousemove',e=>{cv.style.cursor=!entered&&pick(e.clientX,e.clientY)>=0?'pointer':'default'});
+
+let avg=16,lastT=null,qCheck=0;
+const t0=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);if(!gl)return;
+  const dt=lastT===null?16:now-lastT;lastT=now;avg=avg*.92+dt*.08;
+  if(now-qCheck>1500){qCheck=now;if(avg>26&&scale>.35)scale=Math.max(.35,scale-.1);else if(avg<15&&scale<.85)scale=Math.min(.85,scale+.05);
+    document.getElementById('q').textContent='画质 自动 · '+Math.round(scale*100)+'% · '+Math.round(1000/avg)+' fps'}
+  stepTween(now);ensureFBO();const T=(now-t0)/1000;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,fw,fh);gl.useProgram(PS.p);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(PS.a);gl.vertexAttribPointer(PS.a,2,gl.FLOAT,false,0,0);
+  gl.uniform2f(PS.u.R,fw,fh);gl.uniform1f(PS.u.T,T);gl.uniform3fv(PS.u.uRo,S.ro);gl.uniform3fv(PS.u.uTa,S.ta);
+  gl.uniform1f(PS.u.uLab,S.lab);gl.uniform1f(PS.u.uEnter,S.enter);gl.uniform1f(PS.u.uPortal,portal);gl.uniform1f(PS.u.uFocal,focalNow());
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,cv.width,cv.height);gl.useProgram(PP.p);
+  gl.enableVertexAttribArray(PP.a);gl.vertexAttribPointer(PP.a,2,gl.FLOAT,false,0,0);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(PP.u.S,0);
+  gl.uniform2f(PP.u.R,cv.width,cv.height);gl.uniform1f(PP.u.T,T);gl.uniform1f(PP.u.uLab,S.lab);
+  gl.drawArrays(gl.TRIANGLES,0,3)}
+const startHash=location.hash.slice(1);
+if(NODES.includes(startHash)&&startHash!=='entry'){node=startHash;const c=camFor(node,false);S.ro=[...c.ro];S.ta=[...c.ta];if(node in PORTAL)portal=PORTAL[node]}
+ui();requestAnimationFrame(frame);
+</script>
+</body>
+</html>

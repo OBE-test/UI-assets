@@ -1,0 +1,8 @@
+# 渲染输出（随时可重渲；最终成片放 GitHub Releases）
+out/
+*.mp4
+*.webm
+*.mov
+__pycache__/
+.DS_Store
+node_modules/

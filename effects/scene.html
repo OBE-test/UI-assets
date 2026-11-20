@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Effect scene · ?fx=&lt;id&gt;</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block}</style>
+</head><body>
+<canvas id="gl"></canvas><canvas id="c2"></canvas>
+<script src="../core/runtime.js"></script>
+<script src="effects.js"></script>
+<script>
+// 通用效果播放器：effects/scene.html?fx=net&dur=10
+// 网页里可以 <iframe src=".../effects/scene.html?fx=neb"> 当背景；视频用 video/render.py 逐帧渲。
+const Q = new URLSearchParams(location.search);
+const id = Q.get('fx') || 'neb';
+const DUR = +(Q.get('dur') || 10);
+const { PRE, FX, make2D } = window.FXLIB;
+const fx = FX.find(f => f.id === id);
+if (!fx) throw new Error('unknown fx ' + id + ' — 可用: ' + FX.map(f => f.id).join(','));
+document.title = fx.nm + ' · #' + fx.id;
+
+// 2D 效果里的 Math.random 换成固定种子，保证每次渲出来一样
+Math.random = Scene.rng(1234);
+
+const glc = document.getElementById('gl'), c2 = document.getElementById('c2');
+let drawFn;
+function setup() {
+  const W = innerWidth, H = innerHeight;
+  if (fx.glsl) {
+    c2.style.display = 'none'; glc.width = W; glc.height = H;
+    const g = glc.getContext('webgl', { preserveDrawingBuffer: true, antialias: false });
+    const mk = (t, s) => { const o = g.createShader(t); g.shaderSource(o, s); g.compileShader(o);
+      if (!g.getShaderParameter(o, g.COMPILE_STATUS)) throw new Error(g.getShaderInfoLog(o)); return o; };
+    const pr = g.createProgram();
+    g.attachShader(pr, mk(g.VERTEX_SHADER, 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'));
+    g.attachShader(pr, mk(g.FRAGMENT_SHADER, PRE + fx.glsl)); g.linkProgram(pr); g.useProgram(pr);
+    const b = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, b);
+    g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), g.STATIC_DRAW);
+    const a = g.getAttribLocation(pr, 'p'); g.enableVertexAttribArray(a); g.vertexAttribPointer(a, 2, g.FLOAT, false, 0, 0);
+    const uR = g.getUniformLocation(pr, 'R'), uT = g.getUniformLocation(pr, 'T');
+    drawFn = t => { g.viewport(0, 0, W, H); g.uniform2f(uR, W, H); g.uniform1f(uT, t); g.drawArrays(g.TRIANGLES, 0, 3); g.finish(); };
+  } else {
+    glc.style.display = 'none'; c2.width = W; c2.height = H;
+    drawFn = make2D(fx.js, c2.getContext('2d'), W, H);
+  }
+}
+setup(); addEventListener('resize', setup);
+Scene.define({ duration: DUR, fps: 30, draw(t) { drawFn(t); } });
+</script></body></html>

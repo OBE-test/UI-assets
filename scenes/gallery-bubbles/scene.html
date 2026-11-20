@@ -1,0 +1,79 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Gallery · 珠链泡泡 loop</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}canvas{width:100vw;height:100vh;display:block}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script src="../../core/runtime.js"></script>
+<script>
+// 效果库代号: iri (+ 规则泡沫背景) | 用在 曲线画廊 · 泡泡版
+// prompt: pearl-chain soap bubbles along an S-curve, thin-film interference (n=1.33),
+//         aurora-cold + pastel palettes, big-small pearl rhythm, faint regular hex foam, dark bg, seamless loop
+const DUR = 10, N = 12;
+const c = document.getElementById('c');
+const fit = () => { c.width = innerWidth; c.height = innerHeight; };
+fit(); addEventListener('resize', fit);
+
+const sh = Scene.shader(c, `
+uniform float uN;
+float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){s+=a*vn(p);p*=2.03;a*=.5;}return s;}
+vec2 path(float s){ // s 0..1 → 屏幕坐标（以高为 1）
+  float x = mix(-1.15, 1.15, s);
+  return vec2(x, .22*sin(s*TAU*1.1+.6) - .05*cos(s*TAU*2.3));
+}
+vec3 film(float d,float ct){vec3 lam=vec3(650.,532.,450.);return .5+.5*cos(TAU*2.*1.33*d*ct/lam);}
+// 规则泡沫：六边形网格边
+float hexEdge(vec2 p){
+  const vec2 r=vec2(1.,1.7320508);
+  vec2 a=mod(p,r)-r*.5, b=mod(p-r*.5,r)-r*.5;
+  vec2 g=dot(a,a)<dot(b,b)?a:b;
+  vec2 q=abs(g); float d=max(q.x*.5+q.y*.8660254,q.x);
+  return .5-d;
+}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-.5*uRes)/uRes.y;
+  // 背景
+  vec3 col=vec3(.006,.008,.016)+vec3(.01,.02,.04)*exp(-dot(uv,uv)*1.5);
+  float he=hexEdge(uv*7.+vec2(0.,uLoop*1.7320508*2.));        // 慢速上漂，整数格周期 → 无缝
+  col+=vec3(.25,.4,.6)*.05*smoothstep(.03,.0,he)*(1.-smoothstep(.2,1.,length(uv)));
+  vec3 acc=vec3(0.); float cover=0.;
+  for(int i=0;i<16;i++){
+    if(float(i)>=uN) break;
+    float s=fract((float(i)+uLoop*2.)/uN);                     // 每循环前进 2 格，大小/配色奇偶不变
+    vec2 c=path(s);
+    float par=mod(float(i),2.);
+    float edgeFade=smoothstep(0.,.08,s)*smoothstep(1.,.92,s);
+    float r=(par<.5? .135 : .075)*(.85+.3*sin(s*3.14159))*edgeFade;   // 珍珠渐变：大-小节奏 + 中段放大
+    if(r<.002) continue;
+    vec2 q=(uv-c)/r; float l2=dot(q,q);
+    if(l2>1.3) continue;
+    float l=sqrt(l2);
+    float z=sqrt(max(1.-l2,0.)); float ct=max(z,.05);
+    vec2 fl=vec2(cos(uLoop*TAU),sin(uLoop*TAU))*.6;               // 循环噪声相位
+    float th=260.+380.*fbm(q*1.6+fl+(float(i)+uLoop*2.)*1.3+vec2(0.,-l*1.5));
+    vec3 f=film(th,ct);
+    vec3 palA=mix(vec3(.15,.85,.85),vec3(.55,.35,1.),f.b);       // 极光冷调 teal→violet
+    vec3 palB=mix(vec3(1.,.72,.82),vec3(.62,.95,.78),f.g);       // 粉彩高阶 rose→mint
+    vec3 pal=par<.5?palA:palB;
+    float fres=pow(1.-ct,3.);
+    float body=smoothstep(1.,.97,l);
+    vec3 b=pal*(f*.8+.2)*(.10+1.2*fres)*body;
+    // 高光（窗格反射）
+    vec2 hp=q-vec2(-.38,.42); b+=vec3(1.)*smoothstep(.18,.0,length(hp*vec2(1.,1.6)))*.9*body;
+    b+=vec3(.9,.95,1.)*smoothstep(.08,.0,length(q-vec2(.42,-.45)))*.5*body;
+    // 外缘光晕
+    b+=pal*.18*exp(-pow((l-1.)*9.,2.));
+    acc+=b; cover=max(cover,body*.15);
+  }
+  col=col*(1.-cover)+acc;
+  col=1.-exp(-col*1.4);
+  fragColor=vec4(pow(col,vec3(.92)),1.);
+}`);
+
+Scene.define({
+  duration: DUR, fps: 30,
+  draw(t) { sh.draw(t, (t % DUR) / DUR, { uN: N }); }
+});
+</script></body></html>

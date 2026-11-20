@@ -1,0 +1,778 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>摧毀只是一瞬間 · Prototype 01</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+SC:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: full-bleed WebGL hall; a quiet HUD in three corners — title, state rail, element panel. Single committed dark look. */
+  :root {
+    --ink: #0e0d0c;
+    --panel: rgba(18, 17, 15, 0.78);
+    --bone: #e8e2d6;
+    --ash: #8d867b;
+    --line: rgba(232, 226, 214, 0.14);
+    --brass: #c8a46a;
+    --frost: #a9bccf;
+    --f-display: "Noto Serif TC", "Songti TC", "STSong", serif;
+    --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--ink); color: var(--bone);
+    font-family: var(--f-body); overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage { position: fixed; inset: 0; display: block; touch-action: none; }
+  .hud { position: fixed; inset: 0; pointer-events: none; }
+  .hud > * { pointer-events: auto; }
+
+  .masthead {
+    position: absolute;
+    top: calc(20px + env(safe-area-inset-top, 0px));
+    left: max(20px, env(safe-area-inset-left, 0px));
+    max-width: calc(100% - 40px);
+    pointer-events: none;
+  }
+  .masthead h1 {
+    margin: 0; font-family: var(--f-display); font-weight: 700;
+    font-size: clamp(22px, 3.2vw, 34px); letter-spacing: 0.08em; line-height: 1.2;
+    text-wrap: balance;
+  }
+  .masthead p {
+    margin: 6px 0 0; font-family: var(--f-mono); font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash);
+  }
+
+  .rail {
+    position: absolute;
+    top: calc(22px + env(safe-area-inset-top, 0px));
+    right: max(20px, env(safe-area-inset-right, 0px));
+    display: flex; gap: 2px; padding: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.06em;
+  }
+  .rail span {
+    padding: 6px 10px; border-radius: 999px; color: var(--ash);
+    transition: background .3s, color .3s; white-space: nowrap;
+  }
+  .rail span b { font-weight: 500; margin-left: 4px; }
+  .rail span.on { background: var(--bone); color: var(--ink); }
+
+  .panel {
+    position: absolute;
+    left: max(20px, env(safe-area-inset-left, 0px));
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: min(440px, calc(100% - 40px));
+    display: grid; gap: 12px; padding: 16px 18px 14px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  .panel .eyebrow {
+    font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--brass);
+  }
+  .panel h2 {
+    margin: 2px 0 0; font-family: var(--f-display); font-weight: 500;
+    font-size: 22px; letter-spacing: 0.06em;
+  }
+  .panel .desc { margin: 0; font-size: 13.5px; line-height: 1.7; color: #cfc8bb; }
+  .panel .meta { font-family: var(--f-mono); font-size: 11px; color: var(--ash); letter-spacing: 0.04em; }
+  .progress { height: 2px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--brass); }
+
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row .grow { flex: 1; }
+  button {
+    font: inherit; font-size: 13px; color: var(--bone); cursor: pointer;
+    background: transparent; border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 14px; transition: background .2s, border-color .2s, opacity .2s;
+  }
+  button:hover:not(:disabled) { border-color: var(--bone); }
+  button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  button:disabled { opacity: .35; cursor: default; }
+  button.primary { background: var(--bone); color: var(--ink); border-color: var(--bone); }
+  .chips button { font-family: var(--f-mono); font-size: 12px; padding: 6px 12px; }
+  .chips button.current { border-color: var(--brass); color: var(--brass); }
+
+  .tag {
+    position: absolute; left: 0; top: 0; transform: translate(-50%, -100%);
+    display: grid; justify-items: center; gap: 2px;
+    border: 0; padding: 6px 10px; border-radius: 8px; background: transparent;
+    font-family: var(--f-display); font-size: 15px; letter-spacing: 0.1em;
+    color: var(--bone); text-shadow: 0 1px 8px rgba(0,0,0,.8);
+    transition: opacity .35s;
+  }
+  .tag small { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--ash); }
+  .tag:hover:not(:disabled) { color: var(--brass); }
+  .tag[data-off="1"] { opacity: 0; pointer-events: none; }
+
+  .keys {
+    position: absolute;
+    right: max(20px, env(safe-area-inset-right, 0px));
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    font-family: var(--f-mono); font-size: 11px; color: var(--ash); line-height: 1.8;
+    text-align: right; pointer-events: none;
+  }
+  .keys kbd {
+    font: inherit; color: var(--bone); border: 1px solid var(--line);
+    border-radius: 4px; padding: 0 5px; margin-left: 4px;
+  }
+  .fail {
+    position: absolute; inset: 0; display: grid; place-items: center; padding: 24px;
+    text-align: center; color: var(--ash); font-size: 14px;
+  }
+
+  @media (max-width: 720px) {
+    .rail {
+      top: calc(84px + env(safe-area-inset-top, 0px));
+      left: max(16px, env(safe-area-inset-left, 0px)); right: auto;
+      max-width: calc(100% - 32px); overflow-x: auto; }
+    .rail span b { display: none; }
+    .masthead { left: max(16px, env(safe-area-inset-left, 0px)); }
+    .panel { left: max(16px, env(safe-area-inset-left, 0px)); width: calc(100% - 32px); }
+    .keys { display: none; }
+  }
+</style>
+
+<canvas id="stage" aria-label="三维艺术馆场景"></canvas>
+
+<div class="hud">
+  <header class="masthead">
+    <h1>摧毀只是一瞬間</h1>
+    <p>互动艺术馆 · Prototype 01 · 临时几何体</p>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="镜头状态">
+    <span data-s="explore">探索<b>Explore</b></span>
+    <span data-s="focus">聚焦<b>Focus</b></span>
+    <span data-s="cinematic">演出<b>Cinematic</b></span>
+    <span data-s="inspect">观察<b>Inspect</b></span>
+    <span data-s="transition">切换<b>Transition</b></span>
+  </nav>
+
+  <div id="tags"></div>
+
+  <section class="panel" id="panel" aria-live="polite">
+    <div>
+      <div class="eyebrow" id="p-eyebrow">展厅</div>
+      <h2 id="p-title">三件装置</h2>
+    </div>
+    <p class="desc" id="p-desc">拖动可小范围环顾展厅。点击任意一件装置，镜头会靠近并开始演出。</p>
+    <div class="progress" id="p-progress" hidden><i id="p-bar"></i></div>
+    <div class="row">
+      <button id="b-skip" class="primary" hidden>跳过演出</button>
+      <button id="b-replay" hidden>重播</button>
+      <button id="b-back" hidden>返回展厅</button>
+      <span class="grow"></span>
+      <div class="row chips" id="chips"></div>
+    </div>
+    <div class="meta" id="p-meta">对应章节：待接入原文</div>
+  </section>
+
+  <div class="keys">
+    <div>选择装置<kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></div>
+    <div>跳过<kbd>Space</kbd> 重播<kbd>R</kbd> 返回<kbd>Esc</kbd></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const gsap = window.gsap;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+/* ───────── Phase 01 · Scene foundation ───────── */
+const canvas = document.getElementById('stage');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+} catch (e) {
+  document.querySelector('.hud').innerHTML = '<div class="fail">此浏览器无法启动 WebGL。请换用最新版 Chrome、Edge 或 Safari 打开。</div>';
+  throw e;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e0d0c);
+scene.fog = new THREE.Fog(0x0e0d0c, 16, 36);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+const HALL = { pos: new THREE.Vector3(0, 4.2, 13.5), target: new THREE.Vector3(0, 1.6, -0.5) };
+camera.position.set(0, 7, 24);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.55;
+controls.enablePan = false;
+controls.target.copy(HALL.target);
+controls.enabled = false;
+
+scene.add(new THREE.HemisphereLight(0x9aa6b4, 0x1a1612, 0.35));
+const fill = new THREE.DirectionalLight(0xffe6c4, 0.35);
+fill.position.set(-6, 10, 8);
+scene.add(fill);
+
+// Floor and walls
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(60, 60),
+  new THREE.MeshStandardMaterial({ color: 0x1b1916, roughness: 0.82, metalness: 0.05 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x1f1d1a, roughness: 0.95 });
+const back = new THREE.Mesh(new THREE.PlaneGeometry(26, 10), wallMat);
+back.position.set(0, 5, -7);
+back.receiveShadow = true;
+scene.add(back);
+for (const s of [-1, 1]) {
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(24, 10), wallMat);
+  w.position.set(s * 12, 5, 3);
+  w.rotation.y = -s * Math.PI / 2;
+  scene.add(w);
+}
+// Ceiling light slots on the back wall: thin bright lines give the hall a scale reference
+const slotMat = new THREE.MeshBasicMaterial({ color: 0x3a3631 });
+for (let i = -2; i <= 2; i++) {
+  const slot = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 7.5), slotMat);
+  slot.position.set(i * 4.6, 4.6, -6.98);
+  scene.add(slot);
+}
+
+/* ───────── Elements ───────── */
+const SPOT = 95;
+const stoneMat = new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.9 });
+
+function makeBase(el, x, z) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  scene.add(g);
+
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 1.8), stoneMat);
+  plinth.position.y = 0.25;
+  plinth.castShadow = plinth.receiveShadow = true;
+  g.add(plinth);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.55, 1.58, 96),
+    new THREE.MeshBasicMaterial({ color: 0xc8a46a, transparent: true, opacity: 0.18 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.01;
+  g.add(ring);
+
+  const spot = new THREE.SpotLight(0xfff0dc, SPOT, 16, 0.4, 0.65, 2);
+  spot.position.set(x, 7.5, z + 1.2);
+  spot.target = g;
+  spot.castShadow = true;
+  spot.shadow.mapSize.set(1024, 1024);
+  spot.shadow.bias = -0.0005;
+  scene.add(spot);
+
+  const flash = new THREE.PointLight(0xa9bccf, 0, 9, 2);
+  g.add(flash);
+
+  const hit = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 3.4, 2),
+    new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
+  );
+  hit.position.y = 1.7;
+  hit.userData.el = el;
+  g.add(hit);
+
+  Object.assign(el, { group: g, spot, flash, ring, hit, center: new THREE.Vector3(x, 1.7, z) });
+}
+
+// Default framing for Focus: step back toward the hall camera, at eye height
+function viewFor(el, dist = 5) {
+  const dir = HALL.pos.clone().sub(el.center).setY(0).normalize();
+  return {
+    pos: el.center.clone().addScaledVector(dir, dist).setY(2.3),
+    target: el.center.clone()
+  };
+}
+
+/* Element A · 碎裂 — a monolith of 64 blocks that bursts and reassembles */
+const A = {
+  key: 'A', name: '碎裂', en: 'Monolith',
+  desc: '一块完整的石碑先是震颤，随后在一瞬间崩解为六十四块碎片，悬停片刻后重新拼合。',
+  inspect: { min: 2.6, max: 7 },
+  build() {
+    makeBase(this, -5.2, 0.8);
+    this.body = new THREE.Group();
+    this.body.position.y = 0.5;
+    this.group.add(this.body);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xcfc8bb, roughness: 0.55, metalness: 0.08 });
+    const geo = new THREE.BoxGeometry(0.29, 0.29, 0.29);
+    this.cubes = [];
+    for (let ix = 0; ix < 4; ix++) for (let iy = 0; iy < 8; iy++) for (let iz = 0; iz < 2; iz++) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set((ix - 1.5) * 0.3, 0.15 + iy * 0.3, (iz - 0.5) * 0.3);
+      m.userData.home = m.position.clone();
+      m.castShadow = m.receiveShadow = true;
+      this.body.add(m);
+      this.cubes.push(m);
+    }
+  },
+  reset() {
+    this.body.position.x = 0;
+    for (const m of this.cubes) { m.position.copy(m.userData.home); m.rotation.set(0, 0, 0); }
+  },
+  update() {},
+  cinematic() {
+    const c = this.center, cubes = this.cubes;
+    const pos = cubes.map(m => m.position), rot = cubes.map(m => m.rotation);
+    for (const m of cubes) {
+      const h = m.userData.home;
+      const d = new THREE.Vector3(h.x, h.y - 1.3, h.z).normalize().multiplyScalar(rand(1.4, 3.2));
+      m.userData.burst = h.clone().add(d).add(new THREE.Vector3(0, rand(0.2, 1.2), 0));
+    }
+    const tl = gsap.timeline();
+    tl.to(camera.position, { x: c.x + 1.3, y: 1.5, z: c.z + 3.3, duration: 1.8, ease: 'power2.inOut' }, 0)
+      .to(controls.target, { x: c.x, y: 2.0, z: c.z, duration: 1.8, ease: 'power2.inOut' }, 0)
+      .to(this.spot, { intensity: SPOT * 2, duration: 1.6 }, 0)
+      .to(this.body.position, { x: '+=0.02', duration: 0.04, repeat: 17, yoyo: true, ease: 'none' }, 1.0)
+      .addLabel('burst', 1.8)
+      .to(this.flash.position, { y: 1.8, duration: 0 }, 'burst')
+      .to(this.flash, { intensity: 40, duration: 0.06 }, 'burst')
+      .to(this.flash, { intensity: 0, duration: 1.4, ease: 'power2.out' }, 'burst+=0.06')
+      .to(shake, { amp: 0.012, duration: 0.05 }, 'burst')
+      .to(shake, { amp: 0, duration: 0.7 }, 'burst+=0.05')
+      .to(pos, { x: i => cubes[i].userData.burst.x, y: i => cubes[i].userData.burst.y, z: i => cubes[i].userData.burst.z,
+                 duration: 1.5, ease: 'expo.out', stagger: { each: 0.003, from: 'center' } }, 'burst')
+      .to(rot, { x: () => rand(-3, 3), y: () => rand(-3, 3), z: () => rand(-3, 3), duration: 1.8, ease: 'expo.out' }, 'burst')
+      .to(camera.position, { x: c.x - 2.6, y: 2.8, z: c.z + 6, duration: 2.6, ease: 'power3.out' }, 'burst')
+      .to(controls.target, { y: 2.3, duration: 2.6, ease: 'power3.out' }, 'burst')
+      .addLabel('rebuild', 'burst+=3.1')
+      .to(pos, { x: i => cubes[i].userData.home.x, y: i => cubes[i].userData.home.y, z: i => cubes[i].userData.home.z,
+                 duration: 1.9, ease: 'power3.inOut', stagger: { each: 0.005, from: 'edges' } }, 'rebuild')
+      .to(rot, { x: 0, y: 0, z: 0, duration: 1.9, ease: 'power3.inOut' }, 'rebuild')
+      .to(camera.position, { x: c.x + 2.2, y: 2.4, z: c.z + 4.4, duration: 2.4, ease: 'power2.inOut' }, 'rebuild')
+      .to(controls.target, { y: 1.7, duration: 2.4, ease: 'power2.inOut' }, 'rebuild')
+      .to(this.spot, { intensity: SPOT, duration: 1.6 }, 'rebuild+=0.6');
+    return tl;
+  }
+};
+
+/* Element B · 消散 — a faceted shell dissolves into 3,000 points and gathers back */
+const B = {
+  key: 'B', name: '消散', en: 'Sphere',
+  desc: '多面体的外壳逐渐褪去，三千个光点向外扩散并旋转，最后收拢回原来的形状。',
+  inspect: { min: 2.4, max: 5.2 },
+  fx: { scatter: 0, swirl: 0 },
+  build() {
+    makeBase(this, 0, -1.6);
+    this.mesh = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.78, 1),
+      new THREE.MeshStandardMaterial({ color: 0x34363a, metalness: 0.85, roughness: 0.22, flatShading: true, transparent: true })
+    );
+    this.mesh.position.y = 1.55;
+    this.mesh.castShadow = true;
+    this.group.add(this.mesh);
+
+    const N = 3000;
+    this.base = new Float32Array(N * 3);
+    this.seed = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const u = Math.random() * 2 - 1, t = Math.random() * Math.PI * 2, r = 0.8, s = Math.sqrt(1 - u * u);
+      this.base.set([Math.cos(t) * s * r, u * r, Math.sin(t) * s * r], i * 3);
+      this.seed[i] = Math.random();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.base.slice(), 3));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xf1e3c8, size: 0.032, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    this.points.position.y = 1.55;
+    this.group.add(this.points);
+  },
+  reset() {
+    this.fx.scatter = 0; this.fx.swirl = 0;
+    this.points.material.opacity = 0;
+    this.mesh.material.opacity = 1;
+    this.mesh.scale.setScalar(1);
+  },
+  update(dt, t) {
+    if (!(S.state === 'cinematic' && S.active === this)) this.mesh.rotation.y += dt * 0.12;
+    if (this.points.material.opacity <= 0.001) return;
+    const p = this.points.geometry.attributes.position.array, b = this.base, { scatter, swirl } = this.fx;
+    for (let i = 0; i < this.seed.length; i++) {
+      const r = this.seed[i], k = 1 + scatter * (0.5 + r * 2.4), a = swirl * (0.4 + r);
+      const ca = Math.cos(a), sa = Math.sin(a), x = b[i * 3], y = b[i * 3 + 1], z = b[i * 3 + 2];
+      const wob = scatter * 0.06 * Math.sin(t * 1.7 + i);
+      p[i * 3] = (x * ca - z * sa) * k + wob;
+      p[i * 3 + 1] = y * k + scatter * r * 0.9;
+      p[i * 3 + 2] = (x * sa + z * ca) * k + wob;
+    }
+    this.points.geometry.attributes.position.needsUpdate = true;
+  },
+  cinematic() {
+    const c = this.center, fx = this.fx, orbit = { a: 0, r: 3.4 };
+    const placeCam = () => camera.position.set(c.x + Math.sin(orbit.a) * orbit.r, 1.6 + orbit.a * -0.5, c.z + Math.cos(orbit.a) * orbit.r);
+    const tl = gsap.timeline();
+    tl.to(camera.position, { x: c.x, y: 1.6, z: c.z + 3.4, duration: 1.6, ease: 'power2.inOut' }, 0)
+      .to(controls.target, { x: c.x, y: 1.55, z: c.z, duration: 1.6, ease: 'power2.inOut' }, 0)
+      .to(this.mesh.rotation, { y: '+=' + Math.PI, duration: 1.6, ease: 'power2.inOut' }, 0)
+      .to(this.mesh.scale, { x: 1.07, y: 1.07, z: 1.07, duration: 0.25, repeat: 3, yoyo: true, ease: 'sine.inOut' }, 0.6)
+      .addLabel('dissolve', 1.6)
+      .to(this.points.material, { opacity: 0.95, duration: 0.6 }, 'dissolve')
+      .to(this.mesh.material, { opacity: 0, duration: 1.0 }, 'dissolve+=0.1')
+      .to(this.mesh.scale, { x: 0.7, y: 0.7, z: 0.7, duration: 1.0 }, 'dissolve+=0.1')
+      .to(fx, { scatter: 1, duration: 2.6, ease: 'power2.out' }, 'dissolve')
+      .to(fx, { swirl: 2.6, duration: 5.6, ease: 'none' }, 'dissolve')
+      .to(this.spot, { intensity: SPOT * 0.35, duration: 1.2 }, 'dissolve')
+      .to(orbit, { a: -Math.PI / 2, r: 4.8, duration: 4.2, ease: 'sine.inOut', onUpdate: placeCam }, 'dissolve')
+      .addLabel('reform', 'dissolve+=3.6')
+      .to(fx, { scatter: 0, duration: 2.2, ease: 'power3.inOut' }, 'reform')
+      .to(this.mesh.material, { opacity: 1, duration: 0.8 }, 'reform+=1.5')
+      .to(this.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.9, ease: 'back.out(2)' }, 'reform+=1.5')
+      .to(this.points.material, { opacity: 0, duration: 0.6 }, 'reform+=2.0')
+      .to(this.spot, { intensity: SPOT, duration: 1.2 }, 'reform+=1.4')
+      .to(orbit, { a: -Math.PI / 5, r: 3.8, duration: 2.4, ease: 'sine.inOut', onUpdate: placeCam }, 'reform+=0.6');
+    return tl;
+  }
+};
+
+/* Element C · 一瞬 — a ring of 36 blades spins up, collapses, bursts and freezes, then returns */
+const C = {
+  key: 'C', name: '一瞬', en: 'Ring',
+  desc: '三十六片刀刃加速旋转，在一瞬间坍缩、爆裂，并在空中凝固；随后缓慢回到原位。',
+  inspect: { min: 2.6, max: 7 },
+  build() {
+    makeBase(this, 5.2, 0.8);
+    this.ringG = new THREE.Group();
+    this.ringG.position.y = 1.95;
+    this.group.add(this.ringG);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xb9b4ab, metalness: 0.9, roughness: 0.3 });
+    const geo = new THREE.BoxGeometry(0.6, 0.045, 0.16);
+    this.blades = [];
+    for (let i = 0; i < 36; i++) {
+      const a = (i / 36) * Math.PI * 2, R = 1.05;
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(Math.cos(a) * R, Math.sin(a) * R, 0);
+      m.rotation.set(0, 0, a);
+      m.userData.home = { p: m.position.clone(), r: a };
+      m.castShadow = true;
+      this.ringG.add(m);
+      this.blades.push(m);
+    }
+    this.core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 24, 16),
+      new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xa9bccf, emissiveIntensity: 0.6 })
+    );
+    this.ringG.add(this.core);
+  },
+  reset() {
+    this.core.scale.setScalar(1);
+    this.core.material.emissiveIntensity = 0.6;
+    for (const m of this.blades) {
+      m.position.copy(m.userData.home.p);
+      m.rotation.set(0, 0, m.userData.home.r);
+      m.scale.setScalar(1);
+    }
+  },
+  update(dt) {
+    if (!(S.state === 'cinematic' && S.active === this)) this.ringG.rotation.z += dt * 0.12;
+  },
+  cinematic() {
+    const c = this.center, bl = this.blades;
+    const pos = bl.map(m => m.position), rot = bl.map(m => m.rotation), scl = bl.map(m => m.scale);
+    for (const m of bl) {
+      m.userData.burst = new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(rand(1.8, 3.4));
+    }
+    const tl = gsap.timeline();
+    tl.to(camera.position, { x: c.x - 0.5, y: 2.0, z: c.z + 3.8, duration: 2.0, ease: 'power2.inOut' }, 0)
+      .to(controls.target, { x: c.x, y: 1.95, z: c.z, duration: 2.0, ease: 'power2.inOut' }, 0)
+      .to(this.ringG.rotation, { z: '+=' + Math.PI * 4, duration: 2.4, ease: 'power3.in' }, 0)
+      .to(this.core.material, { emissiveIntensity: 4, duration: 2.4, ease: 'power2.in' }, 0)
+      .to(this.spot, { intensity: SPOT * 0.3, duration: 2.2 }, 0)
+      .to(pos, { x: 0, y: 0, z: 0, duration: 0.22, ease: 'expo.in' }, 2.2)
+      .to(scl, { x: 0.3, y: 0.3, z: 0.3, duration: 0.22, ease: 'expo.in' }, 2.2)
+      .addLabel('instant', 2.42)
+      .to(this.flash.position, { y: 1.95, duration: 0 }, 'instant')
+      .to(this.flash, { intensity: 70, duration: 0.04 }, 'instant')
+      .to(this.flash, { intensity: 0, duration: 1.1, ease: 'power3.out' }, 'instant+=0.04')
+      .to(this.core.scale, { x: 4, y: 4, z: 4, duration: 0.08 }, 'instant')
+      .to(this.core.scale, { x: 1, y: 1, z: 1, duration: 0.9, ease: 'power3.out' }, 'instant+=0.08')
+      .to(shake, { amp: 0.02, duration: 0.04 }, 'instant')
+      .to(shake, { amp: 0, duration: 0.8 }, 'instant+=0.04')
+      .to(pos, { x: i => bl[i].userData.burst.x, y: i => bl[i].userData.burst.y, z: i => bl[i].userData.burst.z, duration: 0.5, ease: 'expo.out' }, 'instant')
+      .to(scl, { x: 1, y: 1, z: 1, duration: 0.4, ease: 'expo.out' }, 'instant')
+      .to(rot, { x: () => rand(-2, 2), y: () => rand(-2, 2), duration: 0.6, ease: 'expo.out' }, 'instant')
+      // frozen moment: the fragments barely drift while the camera slides around them
+      .to(pos, { x: i => bl[i].userData.burst.x * 1.08, y: i => bl[i].userData.burst.y * 1.08, z: i => bl[i].userData.burst.z * 1.08, duration: 2.6, ease: 'none' }, 'instant+=0.5')
+      .to(camera.position, { x: c.x + 2.6, y: 2.7, z: c.z + 6.0, duration: 0.7, ease: 'expo.out' }, 'instant')
+      .to(camera.position, { x: c.x + 4.2, y: 2.3, z: c.z + 3.6, duration: 2.4, ease: 'sine.inOut' }, 'instant+=0.7')
+      .addLabel('return', 'instant+=3.1')
+      .to(pos, { x: i => bl[i].userData.home.p.x, y: i => bl[i].userData.home.p.y, z: 0, duration: 2.2, ease: 'power3.inOut', stagger: 0.015 }, 'return')
+      .to(rot, { x: 0, y: 0, z: i => bl[i].userData.home.r, duration: 2.2, ease: 'power3.inOut', stagger: 0.015 }, 'return')
+      .to(this.core.material, { emissiveIntensity: 0.6, duration: 1.6 }, 'return')
+      .to(this.spot, { intensity: SPOT, duration: 1.6 }, 'return+=0.4')
+      .to(camera.position, { x: c.x - 1.6, y: 2.3, z: c.z + 4.4, duration: 2.6, ease: 'power2.inOut' }, 'return');
+    return tl;
+  }
+};
+
+const ELEMENTS = [A, B, C];
+ELEMENTS.forEach(el => el.build());
+const hitTargets = ELEMENTS.map(el => el.hit);
+const shake = { amp: 0 };
+
+/* ───────── State (stand-in for the future Zustand store) ───────── */
+const S = { state: 'intro', active: null, tl: null, hover: null };
+
+function applyControls() {
+  const st = S.state;
+  if (st === 'explore') {
+    Object.assign(controls, {
+      enabled: true, minDistance: 10, maxDistance: 16,
+      minAzimuthAngle: -0.45, maxAzimuthAngle: 0.45,
+      minPolarAngle: 1.05, maxPolarAngle: 1.45
+    });
+  } else if (st === 'inspect') {
+    const { min, max } = S.active.inspect;
+    const d = camera.position.distanceTo(controls.target);
+    Object.assign(controls, {
+      enabled: true, minDistance: Math.min(min, d), maxDistance: Math.max(max, d),
+      minAzimuthAngle: -Infinity, maxAzimuthAngle: Infinity,
+      minPolarAngle: 0.25, maxPolarAngle: 1.5
+    });
+    // Ease the limits back to the intended range after a short moment
+    gsap.to(controls, { minDistance: min, maxDistance: max, duration: 1.2, delay: 0.2 });
+  } else {
+    controls.enabled = false;
+  }
+}
+
+function setState(s) {
+  S.state = s;
+  applyControls();
+  renderUI();
+}
+
+function flyTo(pos, target, { duration = 1.8, arc = 0.6, onComplete } = {}) {
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  const mid = p0.clone().lerp(pos, 0.5);
+  mid.y += arc;
+  // pull the arc's control point back from the targets so the path clears the plinths
+  mid.add(p0.clone().sub(t0).setY(0).normalize().multiplyScalar(arc * 0.8));
+  const o = { t: 0 };
+  return gsap.to(o, {
+    t: 1, duration, ease: 'power2.inOut', onComplete,
+    onUpdate() {
+      const t = o.t, it = 1 - t;
+      camera.position.set(
+        it * it * p0.x + 2 * it * t * mid.x + t * t * pos.x,
+        it * it * p0.y + 2 * it * t * mid.y + t * t * pos.y,
+        it * it * p0.z + 2 * it * t * mid.z + t * t * pos.z
+      );
+      controls.target.lerpVectors(t0, target, t);
+    }
+  });
+}
+
+const locked = () => ['intro', 'focus', 'cinematic', 'transition'].includes(S.state);
+
+/* Phase 02 + 05 · Select → Focus (or Transition from another element) */
+function select(el) {
+  if (locked() || S.active === el && S.state === 'inspect') return;
+  const switching = !!S.active;
+  S.active = el;
+  setState(switching ? 'transition' : 'focus');
+  const v = viewFor(el);
+  flyTo(v.pos, v.target, {
+    duration: switching ? 2.4 : 1.8,
+    arc: switching ? 2.6 : 0.6,
+    onComplete: () => playCinematic(el)
+  });
+}
+
+/* Phase 03 · Cinematic */
+function playCinematic(el) {
+  el.reset();
+  setState('cinematic');
+  S.tl = el.cinematic();
+  S.tl.eventCallback('onComplete', () => { S.tl = null; shake.amp = 0; setState('inspect'); });
+}
+
+/* Phase 04 · Inspect actions */
+function replay() {
+  if (S.state !== 'inspect') return;
+  const v = viewFor(S.active);
+  setState('focus');
+  flyTo(v.pos, v.target, { duration: 1.2, arc: 0.4, onComplete: () => playCinematic(S.active) });
+}
+function skip() { if (S.state === 'cinematic' && S.tl) S.tl.progress(1); }
+function backToHall() {
+  if (S.state !== 'inspect') return;
+  setState('transition');
+  flyTo(HALL.pos, HALL.target, {
+    duration: 2.2, arc: 1.8,
+    onComplete: () => { S.active = null; setState('explore'); }
+  });
+}
+
+/* ───────── Interaction: raycasting ───────── */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(e) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(hitTargets, false)[0];
+  return hit ? hit.object.userData.el : null;
+}
+let down = null;
+canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerup', e => {
+  if (!down) return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+  down = null;
+  if (moved > 6) return;
+  const el = pick(e);
+  if (el) select(el);
+});
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  const el = locked() ? null : pick(e);
+  const can = el && !(S.active === el && S.state === 'inspect');
+  S.hover = can ? el : null;
+  canvas.style.cursor = can ? 'pointer' : (controls.enabled ? 'grab' : 'default');
+});
+
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') backToHall();
+  else if (e.key === ' ' || e.key === 'Enter') { if (S.state === 'cinematic') { e.preventDefault(); skip(); } }
+  else if (e.key === 'r' || e.key === 'R') replay();
+  else if (['1', '2', '3'].includes(e.key)) select(ELEMENTS[+e.key - 1]);
+});
+
+/* ───────── HUD ───────── */
+const $ = id => document.getElementById(id);
+const tagsEl = $('tags'), chipsEl = $('chips');
+for (const el of ELEMENTS) {
+  const tag = document.createElement('button');
+  tag.className = 'tag';
+  tag.innerHTML = `${el.name}<small>${el.key} · ${el.en}</small>`;
+  tag.addEventListener('click', () => select(el));
+  tagsEl.appendChild(tag);
+  el.tag = tag;
+
+  const chip = document.createElement('button');
+  chip.textContent = el.key;
+  chip.title = `${el.key} · ${el.name}`;
+  chip.setAttribute('aria-label', `前往装置 ${el.key} ${el.name}`);
+  chip.addEventListener('click', () => select(el));
+  chipsEl.appendChild(chip);
+  el.chip = chip;
+}
+$('b-skip').addEventListener('click', skip);
+$('b-replay').addEventListener('click', replay);
+$('b-back').addEventListener('click', backToHall);
+
+const STATE_COPY = {
+  focus: '镜头正在靠近装置。',
+  transition: '镜头正在穿过展厅。',
+  cinematic: '演出进行中，镜头由系统控制。',
+};
+
+function renderUI() {
+  const st = S.state, el = S.active;
+  document.querySelectorAll('#rail span').forEach(s => s.classList.toggle('on', s.dataset.s === st));
+
+  if (!el) {
+    $('p-eyebrow').textContent = '展厅';
+    $('p-title').textContent = '三件装置';
+    $('p-desc').textContent = st === 'transition' ? '镜头正在返回展厅。' : '拖动可小范围环顾展厅。点击任意一件装置，镜头会靠近并开始演出。';
+    $('p-meta').textContent = '对应章节：待接入原文';
+  } else {
+    $('p-eyebrow').textContent = `Element ${el.key} · ${el.en}`;
+    $('p-title').textContent = el.name;
+    $('p-desc').textContent = st === 'inspect'
+      ? el.desc + ' 现在可以拖动旋转、滚轮缩放，从任意角度观察。'
+      : el.desc;
+    $('p-meta').textContent = `对应章节：待接入原文 · ${STATE_COPY[st] || '自由观察'}`;
+  }
+  $('p-progress').hidden = st !== 'cinematic';
+  $('b-skip').hidden = st !== 'cinematic';
+  $('b-replay').hidden = st !== 'inspect';
+  $('b-back').hidden = st !== 'inspect';
+
+  for (const e of ELEMENTS) {
+    e.chip.disabled = locked();
+    e.chip.classList.toggle('current', e === el);
+    e.tag.disabled = locked();
+  }
+  canvas.style.cursor = controls.enabled ? 'grab' : 'default';
+}
+
+/* ───────── Loop ───────── */
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.fov = w < 720 ? 55 : 42;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+const clock = new THREE.Clock(), tmp = new THREE.Vector3();
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  for (const el of ELEMENTS) {
+    el.update(dt, t);
+    const lit = S.hover === el || S.active === el;
+    el.ring.material.opacity += ((lit ? 0.6 : 0.18) - el.ring.material.opacity) * 0.1;
+  }
+
+  if (controls.enabled) {
+    controls.update();
+  } else {
+    camera.lookAt(controls.target);
+    if (shake.amp > 0 && !reduceMotion) {
+      camera.rotation.x += (Math.random() - 0.5) * shake.amp;
+      camera.rotation.y += (Math.random() - 0.5) * shake.amp;
+    }
+  }
+  if (camera.position.y < 0.4) camera.position.y = 0.4;
+
+  // Labels: visible while choosing, hidden on the element being watched
+  const w = innerWidth, h = innerHeight;
+  for (const el of ELEMENTS) {
+    tmp.copy(el.center).setY(3.55).project(camera);
+    const show = (S.state === 'explore' || S.state === 'inspect') && S.active !== el && tmp.z < 1;
+    el.tag.dataset.off = show ? '0' : '1';
+    el.tag.style.transform = `translate(${(tmp.x * 0.5 + 0.5) * w}px, ${(-tmp.y * 0.5 + 0.5) * h}px) translate(-50%, -100%)`;
+  }
+  if (S.tl) $('p-bar').style.width = (S.tl.progress() * 100).toFixed(1) + '%';
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+renderUI();
+tick();
+flyTo(HALL.pos, HALL.target, { duration: reduceMotion ? 0.01 : 2.6, arc: 1.5, onComplete: () => setState('explore') });
+</script>
+
+</body></html>

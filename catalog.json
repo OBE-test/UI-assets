@@ -1,0 +1,608 @@
+{
+ "version": 1,
+ "updated": "2026-11-20",
+ "count": 33,
+ "items": [
+  {
+   "id": "body",
+   "type": "effect",
+   "name": "SDF 光体人形",
+   "name_en": "SDF light body",
+   "category": "形体",
+   "tags": [
+    "glsl",
+    "符号距离场",
+    "Fresnel 边缘光"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 网光体、各层光体的基础人形",
+   "tech": "用符号距离函数（SDF）拼出头、躯干、四肢，平滑并集连接；光线步进求交，Fresnel 公式算边缘光，移动扫描线表示网状能量。",
+   "prompt": "SDF raymarched humanoid, smooth-union capsules, fresnel rim glow, moving scanlines, blue light body",
+   "path": "effects/scene.html?fx=body",
+   "thumb": "effects/thumbs/body.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=body&dur=10\""
+  },
+  {
+   "id": "jul",
+   "type": "effect",
+   "name": "Julia 分形",
+   "name_en": "Julia set",
+   "category": "形体",
+   "tags": [
+    "glsl",
+    "复数迭代 z²",
+    "c"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 抽象展厅墙面、章节转场",
+   "tech": "在复平面上反复迭代 z² + c，参数 c 缓慢移动，用平滑逃逸次数着色。",
+   "prompt": "animated Julia set, smooth escape-time coloring, cosine palette, slowly orbiting c",
+   "path": "effects/scene.html?fx=jul",
+   "thumb": "effects/thumbs/jul.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=jul&dur=10\""
+  },
+  {
+   "id": "mb",
+   "type": "effect",
+   "name": "Mandelbulb",
+   "name_en": "Mandelbulb 3D fractal",
+   "category": "形体",
+   "tags": [
+    "glsl",
+    "三维分形"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 抽象展厅的中心雕塑",
+   "tech": "8 次幂 Mandelbulb 的距离估计函数，用 orbit trap 着色，用步进次数近似环境光遮蔽。",
+   "prompt": "raymarched Mandelbulb power 8, distance estimator, orbit-trap coloring, step-count ambient occlusion, orbiting camera",
+   "path": "effects/scene.html?fx=mb",
+   "thumb": "effects/thumbs/mb.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=mb&dur=10\""
+  },
+  {
+   "id": "gyr",
+   "type": "effect",
+   "name": "Gyroid 极小曲面",
+   "name_en": "Gyroid TPMS lattice",
+   "category": "形体",
+   "tags": [
+    "glsl",
+    "三周期极小曲面晶格"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 网光体的内部骨架、能量晶格",
+   "tech": "陀螺极小曲面 sin(p)·cos(p.zxy) 取绝对值成薄壳，再与球体求交，外围加距离发光。",
+   "prompt": "gyroid triply periodic minimal surface shell clipped by sphere, raymarched, cyan diffuse, fresnel, distance glow",
+   "path": "effects/scene.html?fx=gyr",
+   "thumb": "effects/thumbs/gyr.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=gyr&dur=10\""
+  },
+  {
+   "id": "iri",
+   "type": "effect",
+   "name": "薄膜干涉虹彩",
+   "name_en": "Thin-film iridescence",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "肥皂泡、全息片的干涉色"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 高阶身的表面质感",
+   "tech": "按球面法线和视角估算薄膜光程差，用余弦调色还原干涉色，叠加 Fresnel 和高光。",
+   "prompt": "thin-film interference iridescent sphere, view-dependent cosine palette, fbm thickness, fresnel, specular",
+   "path": "effects/scene.html?fx=iri",
+   "thumb": "effects/thumbs/iri.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=iri&dur=10\""
+  },
+  {
+   "id": "god",
+   "type": "effect",
+   "name": "体积光",
+   "name_en": "Volumetric god rays",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "光线穿过遮挡物散射"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 入口和展厅的主光",
+   "tech": "屏幕空间径向采样：从每个像素朝光源方向走 60 步，累积没被遮挡的亮度，形成光束。",
+   "prompt": "screen-space volumetric light scattering, radial sampling toward light, rotating occluder spokes, warm god rays",
+   "path": "effects/scene.html?fx=god",
+   "thumb": "effects/thumbs/god.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=god&dur=10\""
+  },
+  {
+   "id": "cau",
+   "type": "effect",
+   "name": "水波焦散",
+   "name_en": "Water caustics",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "折射光聚焦的光网"
+   ],
+   "used_in": [
+    "P1",
+    "bg"
+   ],
+   "use_note": "P1 展厅地面、水下氛围",
+   "tech": "多次迭代三角函数扭曲坐标，取倒数距离再求幂，得到水底那种会流动的焦散光网。",
+   "prompt": "tileable procedural water caustics, iterative trig warping, sharp bright filaments, cyan tint",
+   "path": "effects/scene.html?fx=cau",
+   "thumb": "effects/thumbs/cau.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=cau&dur=10\""
+  },
+  {
+   "id": "pri",
+   "type": "effect",
+   "name": "棱镜色散",
+   "name_en": "Prism dispersion",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "白光分解成光谱"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 七身色彩的引子",
+   "tech": "等边三角棱镜用 SDF 描边，入射白光是一条发光线段，出射扇面按角度映射到波长色谱。",
+   "prompt": "triangular prism SDF outline, white beam in, spectral fan out, wavelength-to-RGB mapping, animated spread",
+   "path": "effects/scene.html?fx=pri",
+   "thumb": "effects/thumbs/pri.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=pri&dur=10\""
+  },
+  {
+   "id": "gla",
+   "type": "effect",
+   "name": "玻璃折射色散",
+   "name_en": "Chromatic glass refraction",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "三波长折射",
+    "反射"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 高阶身的透明质感",
+   "tech": "光线步进环面体，红绿蓝三个波长用不同折射率（1.35 / 1.5 / 1.65）折射，边缘自然分色，再叠加 Fresnel 反射。",
+   "prompt": "raymarched glass torus, per-channel refraction IOR 1.35/1.5/1.65, chromatic dispersion, fresnel reflection, striped environment",
+   "path": "effects/scene.html?fx=gla",
+   "thumb": "effects/thumbs/gla.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=gla&dur=10\""
+  },
+  {
+   "id": "int",
+   "type": "effect",
+   "name": "波干涉条纹",
+   "name_en": "Wave interference",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "全息照相原理"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 层与层之间的过渡；也可用于全息项目",
+   "tech": "三个移动点波源的余弦波叠加后取平方，就是干涉强度，也是全息记录的物理原理。",
+   "prompt": "three moving point sources, summed cosine waves squared, interference fringes, holographic iridescent tint",
+   "path": "effects/scene.html?fx=int",
+   "thumb": "effects/thumbs/int.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=int&dur=10\""
+  },
+  {
+   "id": "bh",
+   "type": "effect",
+   "name": "引力透镜",
+   "name_en": "Gravitational lensing",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "光线弯曲",
+    "吸积盘"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 「摧毁」的奇点意象",
+   "tech": "按爱因斯坦透镜公式偏折背景坐标，叠加有多普勒亮度差的吸积盘、被弯到上方的盘面和光子环。",
+   "prompt": "black hole gravitational lensing, einstein-ring deflection of starfield, doppler-beamed accretion disk, photon ring",
+   "path": "effects/scene.html?fx=bh",
+   "thumb": "effects/thumbs/bh.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=bh&dur=10\""
+  },
+  {
+   "id": "rt",
+   "type": "effect",
+   "name": "实时光线追踪",
+   "name_en": "Real-time ray tracing",
+   "category": "光学",
+   "tags": [
+    "glsl",
+    "反射",
+    "阴影，3 次弹射"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 展品的镜面和金属材质",
+   "tech": "球体和地面用解析公式求交，最多 3 次反射弹射，带硬阴影和高光。",
+   "prompt": "analytic sphere and plane ray tracing, 3 reflection bounces, hard shadows, specular, checker floor, orbiting spheres",
+   "path": "effects/scene.html?fx=rt",
+   "thumb": "effects/thumbs/rt.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=rt&dur=10\""
+  },
+  {
+   "id": "net",
+   "type": "effect",
+   "name": "网光体网络",
+   "name_en": "Voronoi light network",
+   "category": "结构线",
+   "tags": [
+    "glsl",
+    "Voronoi 网格",
+    "脉冲"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 网光体表面的网状结构",
+   "tech": "Voronoi 胞腔最近距离与次近距离之差（F2 − F1）画出网格边，节点随时间漂移，再叠一圈圈径向脉冲。",
+   "prompt": "animated voronoi F2-F1 edges, glowing nodes, radial energy pulse, cyan light network",
+   "path": "effects/scene.html?fx=net",
+   "thumb": "effects/thumbs/net.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=net&dur=10\""
+  },
+  {
+   "id": "lor",
+   "type": "effect",
+   "name": "奇异吸引子",
+   "name_en": "Lorenz attractor",
+   "category": "结构线",
+   "tags": [
+    "canvas2d",
+    "Lorenz 微分方程轨迹"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 章节意象：混沌、蝴蝶效应",
+   "tech": "对 Lorenz 方程（σ = 10，ρ = 28，β = 8/3）做 8000 步数值积分，绕竖轴旋转投影，白点沿轨迹运动。",
+   "prompt": "Lorenz attractor sigma 10 rho 28 beta 8/3, euler integration 8000 steps, rotating projection, pink thin lines, moving head",
+   "path": "effects/scene.html?fx=lor",
+   "thumb": "effects/thumbs/lor.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=lor&dur=10\""
+  },
+  {
+   "id": "spi",
+   "type": "effect",
+   "name": "参数曲线",
+   "name_en": "Hypotrochoid",
+   "category": "结构线",
+   "tags": [
+    "canvas2d",
+    "万花尺内旋轮线"
+   ],
+   "used_in": [
+    "P1",
+    "bg"
+   ],
+   "use_note": "装饰线、结构纹样、过场",
+   "tech": "内旋轮线 x = (R − r)cos t + d·cos((R − r)t / r)，取 R = 7、r = 3，笔尖距离 d 随时间变化。",
+   "prompt": "hypotrochoid R=7 r=3 animated pen distance, golden thin line, slow rotation",
+   "path": "effects/scene.html?fx=spi",
+   "thumb": "effects/thumbs/spi.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=spi&dur=10\""
+  },
+  {
+   "id": "flow",
+   "type": "effect",
+   "name": "粒子流场",
+   "name_en": "Particle flow field",
+   "category": "氛围",
+   "tags": [
+    "canvas2d",
+    "向量场驱动粒子"
+   ],
+   "used_in": [
+    "P1",
+    "P2",
+    "bg"
+   ],
+   "use_note": "P1 和 P2 通用的能量流、背景粒子",
+   "tech": "每个粒子按三角函数构成的向量场移动，每帧用半透明黑色覆盖，留下拖尾。",
+   "prompt": "particle flow field, trig vector field, trailing fade, teal particles; production: WebGPU compute curl-noise, 100k+ particles",
+   "path": "effects/scene.html?fx=flow",
+   "thumb": "effects/thumbs/flow.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=flow&dur=10\""
+  },
+  {
+   "id": "neb",
+   "type": "effect",
+   "name": "星云域扭曲",
+   "name_en": "Domain-warped nebula",
+   "category": "氛围",
+   "tags": [
+    "glsl",
+    "domain warping"
+   ],
+   "used_in": [
+    "bg"
+   ],
+   "use_note": "背景、章节氛围",
+   "tech": "两层 domain warping：先用 fbm 生成偏移，再拿偏移去扭曲下一层 fbm 的坐标，得到星云般的结构。",
+   "prompt": "two-level domain warped fbm, nebula, deep violet to pink with blue highlights",
+   "path": "effects/scene.html?fx=neb",
+   "thumb": "effects/thumbs/neb.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=neb&dur=10\""
+  },
+  {
+   "id": "vol",
+   "type": "effect",
+   "name": "体积光体",
+   "name_en": "Volumetric emissive body",
+   "category": "氛围",
+   "tags": [
+    "glsl",
+    "3D 密度场体积积分"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 气态身、以太体",
+   "tech": "在球形区域里用 3D fbm 定义密度，按固定步长做体积积分，按半径混合由暖到冷的发光色。",
+   "prompt": "volumetric raymarch 3D fbm density inside sphere, emissive warm core to cool edge, front-to-back accumulation",
+   "path": "effects/scene.html?fx=vol",
+   "thumb": "effects/thumbs/vol.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=vol&dur=10\""
+  },
+  {
+   "id": "aur",
+   "type": "effect",
+   "name": "极光帘幕",
+   "name_en": "Aurora curtains",
+   "category": "氛围",
+   "tags": [
+    "glsl",
+    "分层噪声光带"
+   ],
+   "used_in": [
+    "bg"
+   ],
+   "use_note": "后记、结尾的天空",
+   "tech": "20 层波浪形基线，向上按指数衰减成光帘，再用高频噪声做出竖向光柱，颜色由绿过渡到紫。",
+   "prompt": "layered aurora curtains, fbm wavy baselines, exponential upward falloff, vertical ray noise, green to violet, starfield",
+   "path": "effects/scene.html?fx=aur",
+   "thumb": "effects/thumbs/aur.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=aur&dur=10\""
+  },
+  {
+   "id": "arc",
+   "type": "effect",
+   "name": "能量电弧",
+   "name_en": "Energy arc",
+   "category": "氛围",
+   "tags": [
+    "glsl",
+    "fbm 闪电"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 冲击、摧毁的瞬间",
+   "tech": "用一维 fbm 当路径偏移，按 1 / 距离发光，每秒重采样 12 次，形成闪烁。",
+   "prompt": "fbm lightning between two orbs, inverse-distance glow, 12Hz flicker resampling, electric blue",
+   "path": "effects/scene.html?fx=arc",
+   "thumb": "effects/thumbs/arc.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=arc&dur=10\""
+  },
+  {
+   "id": "dis",
+   "type": "effect",
+   "name": "噪声溶解碎裂",
+   "name_en": "Noise dissolve and fracture",
+   "category": "破坏/维度",
+   "tags": [
+    "glsl",
+    "fbm 溶解",
+    "Voronoi 裂纹"
+   ],
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "P1 「摧毁只是一瞬间」的核心效果",
+   "tech": "fbm 噪声和一个随时间变化的阈值比较，决定哪里消失；阈值边缘发出橙色余烬光，表面叠 Voronoi 裂纹。",
+   "prompt": "fbm threshold dissolve, glowing ember edge, voronoi crack lines on stone surface, animated threshold",
+   "path": "effects/scene.html?fx=dis",
+   "thumb": "effects/thumbs/dis.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=dis&dur=10\""
+  },
+  {
+   "id": "tes",
+   "type": "effect",
+   "name": "四维超立方体",
+   "name_en": "Tesseract projection",
+   "category": "破坏/维度",
+   "tags": [
+    "canvas2d",
+    "4D 旋转投影"
+   ],
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "P2 「多次元」概念的视觉隐喻",
+   "tech": "16 个四维顶点在 XW 和 YZ 平面里旋转，做 4D → 3D → 2D 两次透视投影；金色边在第四维的近侧，蓝色边在远侧。",
+   "prompt": "tesseract 16 vertices 32 edges, rotation in XW and YZ planes, double perspective projection 4D to 2D, gold near-w, blue far-w",
+   "path": "effects/scene.html?fx=tes",
+   "thumb": "effects/thumbs/tes.jpg",
+   "render": "python3 video/render.py effects/scene.html --q \"fx=tes&dur=10\""
+  },
+  {
+   "id": "p2-netbody",
+   "type": "scene",
+   "name": "P2 · 蓝色网光体转台 loop",
+   "name_en": "Blue net light-body turntable",
+   "category": "形体",
+   "used_in": [
+    "P2"
+   ],
+   "tags": [
+    "loop 12s",
+    "SDF",
+    "voronoi"
+   ],
+   "based_on": [
+    "body",
+    "net"
+   ],
+   "prompt": "SDF raymarched neutral humanoid, voronoi F2-F1 surface net, glowing nodes, fresnel rim glow, moving scanline, slow 360° turntable, seamless loop",
+   "path": "scenes/p2-netbody/scene.html",
+   "thumb": "scenes/p2-netbody/thumb.jpg",
+   "render": "python3 video/render.py scenes/p2-netbody/scene.html"
+  },
+  {
+   "id": "gallery-bubbles",
+   "type": "scene",
+   "name": "画廊 · 珠链虹彩泡泡 loop",
+   "name_en": "Pearl-chain iridescent bubbles",
+   "category": "光学",
+   "used_in": [
+    "画廊"
+   ],
+   "tags": [
+    "loop 10s",
+    "thin-film",
+    "极光冷调",
+    "粉彩高阶"
+   ],
+   "based_on": [
+    "iri"
+   ],
+   "prompt": "pearl-chain soap bubbles along an S-curve, thin-film interference (n=1.33), aurora-cold + pastel palettes, big-small pearl rhythm, faint regular hex foam, dark bg, seamless loop",
+   "path": "scenes/gallery-bubbles/scene.html",
+   "thumb": "scenes/gallery-bubbles/thumb.jpg",
+   "render": "python3 video/render.py scenes/gallery-bubbles/scene.html"
+  },
+  {
+   "id": "optical-effect-library",
+   "type": "prototype",
+   "name": "光学渲染效果库（22 效果总览）",
+   "used_in": [
+    "P1",
+    "P2"
+   ],
+   "use_note": "效果数据已抽到 effects/effects.js，这里保留原始页面",
+   "path": "prototypes/optical-effect-library/index.html",
+   "source": "https://claude.ai/artifact/1Fo39v7VDqdxmZ6c5LzMRp",
+   "thumb": "prototypes/optical-effect-library/thumb.jpg"
+  },
+  {
+   "id": "bubble-gallery",
+   "type": "prototype",
+   "name": "Awakenology 泡泡画廊",
+   "used_in": [
+    "画廊"
+   ],
+   "use_note": "曲线画廊泡泡版：珠链 + 规则泡沫，极光冷调 / 粉彩高阶",
+   "path": "prototypes/bubble-gallery/index.html",
+   "source": "https://claude.ai/artifact/3a6ndi4bgkUm17Kj7ZxX17"
+  },
+  {
+   "id": "curve-gallery-effects",
+   "type": "prototype",
+   "name": "曲线画廊 · 效果库",
+   "used_in": [
+    "画廊"
+   ],
+   "use_note": "沿数学曲线排列的效果画廊（Curve Gallery 原理）",
+   "path": "prototypes/curve-gallery-effects/index.html",
+   "source": "https://claude.ai/artifact/HgF2Vi2KeaYovhXZEvuSnT"
+  },
+  {
+   "id": "optical-gallery-m0",
+   "type": "prototype",
+   "name": "光学画廊 M0",
+   "used_in": [
+    "画廊"
+   ],
+   "use_note": "《摧毀只是一瞬間》原型：场景全部由数学公式生成",
+   "path": "prototypes/optical-gallery-m0/index.html",
+   "source": "https://claude.ai/artifact/N9TZaBEhAdF2y7SixULXbz",
+   "thumb": "prototypes/optical-gallery-m0/thumb.jpg"
+  },
+  {
+   "id": "layer01-blue-netbody",
+   "type": "prototype",
+   "name": "第1靈體 · 藍色網光體（v12 转台播放器）",
+   "used_in": [
+    "P2"
+   ],
+   "use_note": "72 帧 Blender 预渲染转台；拖拽旋转",
+   "path": "prototypes/layer01-blue-netbody/index.html",
+   "source": "https://claude.ai/artifact/W6oEegwYzStiAx4yGg1wGR",
+   "thumb": "prototypes/layer01-blue-netbody/thumb.jpg"
+  },
+  {
+   "id": "prologue-keyframes",
+   "type": "prototype",
+   "name": "序言样片 关键帧",
+   "used_in": [
+    "序言"
+   ],
+   "use_note": "地球弧光贯穿四镜；5 张 1080p 关键帧",
+   "path": "prototypes/prologue-keyframes/index.html",
+   "source": "https://claude.ai/artifact/8YVwcTsmgq79ycfJRgDBkW",
+   "thumb": "prototypes/prologue-keyframes/thumb.jpg"
+  },
+  {
+   "id": "destruction-prototype01-a",
+   "type": "prototype",
+   "name": "摧毀只是一瞬間 · Prototype 01（A）",
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "一个连续展厅 + 三个占位装置；Explore → Focus → Cinematic → Inspect → Transition 相机流程",
+   "path": "prototypes/destruction-prototype01-a/index.html",
+   "source": "https://claude.ai/artifact/Ud9JQbxAD3QcyUGSzerz6L"
+  },
+  {
+   "id": "destruction-prototype01-b",
+   "type": "prototype",
+   "name": "摧毀只是一瞬間 · Prototype 01（B）",
+   "used_in": [
+    "P1"
+   ],
+   "use_note": "同名另一版（2026-11-05 更新）",
+   "path": "prototypes/destruction-prototype01-b/index.html",
+   "source": "https://claude.ai/artifact/LFQutU5JQarLqGGj9SMvPH"
+  },
+  {
+   "id": "thought-forms-chapters",
+   "type": "doc",
+   "name": "Thought-Forms 章节整理（1905）",
+   "used_in": [
+    "Thought-Forms"
+   ],
+   "use_note": "22 章导读 + 25 色表色号 + 每章 3D 方向（对应效果代号）",
+   "path": "docs/thought-forms-chapters.md",
+   "source": "https://claude.ai/artifact/Woz4HmcRuEFjPd9TdLL4uo"
+  }
+ ]
+}

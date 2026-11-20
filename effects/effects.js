@@ -1,0 +1,216 @@
+// Awakenology 光学渲染效果库 · 数据模块（从 prototypes/optical-effect-library 抽出，单一来源）
+// 每个效果: id, cat, nm(中文名), en, ds, use[], useTxt, tech, prompt, glsl(片元着色器, uniform R=分辨率 T=时间) 或 js(Canvas2D 实现)
+(function(){
+const PRE=`precision highp float;uniform vec2 R;uniform float T;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+vec2 h2(vec2 p){return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p*=2.;a*=.5;}return v;}
+vec2 vor(vec2 x){vec2 i=floor(x),f=fract(x);float f1=8.,f2=8.;for(int y=-1;y<=1;y++)for(int k=-1;k<=1;k++){vec2 g=vec2(float(k),float(y));vec2 o=h2(i+g);o=.5+.4*sin(T*.6+6.2832*o);float d=length(g+o-f);if(d<f1){f2=f1;f1=d;}else if(d<f2)f2=d;}return vec2(f1,f2);}
+float h3(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
+float n3(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+1.),f.x),f.y),f.z);}
+float f3(vec3 p){return .5*n3(p)+.25*n3(p*2.03)+.125*n3(p*4.01);}
+mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
+`;
+const UV='vec2 uv=(gl_FragCoord.xy*2.-R)/R.y;';
+const CATS=[
+ ["form","形体与分形","SDF · fractal · TPMS"],
+ ["optics","光学","fresnel · refraction · interference"],
+ ["lines","结构线与轨迹","voronoi · ODE · parametric"],
+ ["atmo","流动与氛围","noise · volume · particles"],
+ ["break","破坏与维度","dissolve · 4D projection"]
+];
+const FX=[
+{id:"body",cat:"form",nm:"SDF 光体人形",en:"SDF light body",ds:"符号距离场 + Fresnel 边缘光",use:["P2"],useTxt:"P2 网光体、各层光体的基础人形",
+tech:"用符号距离函数（SDF）拼出头、躯干、四肢，平滑并集连接；光线步进求交，Fresnel 公式算边缘光，移动扫描线表示网状能量。",
+prompt:"SDF raymarched humanoid, smooth-union capsules, fresnel rim glow, moving scanlines, blue light body",
+glsl:`float smin(float a,float b,float k){float hh=clamp(.5+.5*(b-a)/k,0.,1.);return mix(b,a,hh)-k*hh*(1.-hh);}
+float cap(vec3 p,vec3 a,vec3 b,float r){vec3 pa=p-a,ba=b-a;float hh=clamp(dot(pa,ba)/dot(ba,ba),0.,1.);return length(pa-ba*hh)-r;}
+float map(vec3 p){p.xz=rot(T*.4)*p.xz;vec3 q=p;q.x=abs(q.x);
+float d=length(p-vec3(0,.78,0))-.14;d=smin(d,cap(p,vec3(0,.55,0),vec3(0,.05,0),.16),.1);
+d=smin(d,cap(q,vec3(.18,.52,0),vec3(.42,.02,0),.055),.08);d=smin(d,cap(q,vec3(.09,.02,0),vec3(.12,-.78,0),.075),.08);return d;}
+void main(){${UV}vec3 ro=vec3(0,0,2.4),rd=normalize(vec3(uv,-1.6));float t=0.,md=9.;
+for(int i=0;i<80;i++){float d=map(ro+rd*t);md=min(md,d);if(d<.001||t>5.)break;t+=d;}
+vec3 col=vec3(.01,.015,.03)+vec3(.1,.35,1.)*exp(-md*9.)*.45;
+if(t<5.){vec3 p=ro+rd*t;vec2 e=vec2(.001,0);vec3 nn=normalize(vec3(map(p+e.xyy)-map(p-e.xyy),map(p+e.yxy)-map(p-e.yxy),map(p+e.yyx)-map(p-e.yyx)));
+float fr=pow(1.-abs(dot(nn,rd)),2.5);float g=smoothstep(.9,1.,abs(sin(p.y*70.-T*3.)));col+=vec3(.2,.55,1.)*fr*1.4+vec3(.3,.7,1.)*g*.35*(.3+fr);}
+gl_FragColor=vec4(col,1.);}`},
+{id:"jul",cat:"form",nm:"Julia 分形",en:"Julia set",ds:"复数迭代 z² + c",use:["P1"],useTxt:"P1 抽象展厅墙面、章节转场",
+tech:"在复平面上反复迭代 z² + c，参数 c 缓慢移动，用平滑逃逸次数着色。",
+prompt:"animated Julia set, smooth escape-time coloring, cosine palette, slowly orbiting c",
+glsl:`void main(){vec2 z=(gl_FragCoord.xy*2.-R)/R.y*1.25;vec2 c=vec2(-.79+.06*cos(T*.3),.15+.06*sin(T*.4));float it=0.;
+for(int i=0;i<90;i++){z=vec2(z.x*z.x-z.y*z.y,2.*z.x*z.y)+c;if(dot(z,z)>16.)break;it+=1.;}
+vec3 col=vec3(0.);if(it<89.){float sm=it-log2(log2(dot(z,z)))+4.;col=.5+.5*cos(3.+sm/90.*12.+vec3(0.,.6,1.));col*=smoothstep(0.,12.,it);}gl_FragColor=vec4(col,1.);}`},
+{id:"mb",cat:"form",nm:"Mandelbulb",en:"Mandelbulb 3D fractal",ds:"三维分形",use:["P1"],useTxt:"P1 抽象展厅的中心雕塑",
+tech:"8 次幂 Mandelbulb 的距离估计函数，用 orbit trap 着色，用步进次数近似环境光遮蔽。",
+prompt:"raymarched Mandelbulb power 8, distance estimator, orbit-trap coloring, step-count ambient occlusion, orbiting camera",
+glsl:`float de(vec3 p,out float tr){vec3 z=p;float dr=1.,r=0.;tr=9.;for(int i=0;i<6;i++){r=length(z);if(r>2.)break;
+float th=acos(clamp(z.z/r,-1.,1.))*8.,ph=atan(z.y,z.x)*8.;dr=pow(r,7.)*8.*dr+1.;z=pow(r,8.)*vec3(sin(th)*cos(ph),sin(th)*sin(ph),cos(th))+p;tr=min(tr,length(z));}return .5*log(r)*r/dr;}
+void main(){${UV}vec3 ro=vec3(0,0,2.4);ro.xz=rot(T*.15)*ro.xz;vec3 f=normalize(-ro),rr=normalize(cross(vec3(0,1,0),f)),u=cross(f,rr),rd=normalize(f*1.8+uv.x*rr+uv.y*u);
+float t=.5,tr=0.,st=0.;bool hit=false;for(int i=0;i<80;i++){float d=de(ro+rd*t,tr);if(d<.0015*t){hit=true;break;}t+=d;st+=1.;if(t>5.)break;}
+vec3 col=vec3(.02,.015,.04);if(hit){col=mix(vec3(.35,.15,.6),vec3(1.,.75,.35),clamp(tr*.8,0.,1.))*(1.-st/80.)*1.4;}gl_FragColor=vec4(col,1.);}`},
+{id:"gyr",cat:"form",nm:"Gyroid 极小曲面",en:"Gyroid TPMS lattice",ds:"三周期极小曲面晶格",use:["P2"],useTxt:"P2 网光体的内部骨架、能量晶格",
+tech:"陀螺极小曲面 sin(p)·cos(p.zxy) 取绝对值成薄壳，再与球体求交，外围加距离发光。",
+prompt:"gyroid triply periodic minimal surface shell clipped by sphere, raymarched, cyan diffuse, fresnel, distance glow",
+glsl:`float map(vec3 p){p.xz=rot(T*.25)*p.xz;p.yz=rot(.4)*p.yz;float s=7.;float g=abs(dot(sin(p*s),cos(p.zxy*s)))/s-.025;return max(g*.6,length(p)-.95);}
+void main(){${UV}vec3 ro=vec3(0,0,2.4),rd=normalize(vec3(uv,-1.6));float t=0.,md=9.;bool hit=false;
+for(int i=0;i<90;i++){float d=map(ro+rd*t);md=min(md,d);if(d<.0008){hit=true;break;}t+=d;if(t>4.)break;}
+vec3 col=vec3(.01,.015,.03)+vec3(.1,.4,.9)*exp(-md*25.)*.3;
+if(hit){vec3 p=ro+rd*t;vec2 e=vec2(.001,0);vec3 nn=normalize(vec3(map(p+e.xyy)-map(p-e.xyy),map(p+e.yxy)-map(p-e.yxy),map(p+e.yyx)-map(p-e.yyx)));
+float df=max(dot(nn,normalize(vec3(.5,.7,.6))),0.),fr=pow(1.-abs(dot(nn,rd)),2.);col=mix(vec3(.05,.2,.5),vec3(.4,.85,1.),df)*(.4+.6*smoothstep(3.4,1.6,t))+vec3(.6,.9,1.)*fr*.6;}
+gl_FragColor=vec4(col,1.);}`},
+{id:"iri",cat:"optics",nm:"薄膜干涉虹彩",en:"Thin-film iridescence",ds:"肥皂泡、全息片的干涉色",use:["P2"],useTxt:"P2 高阶身的表面质感",
+tech:"按球面法线和视角估算薄膜光程差，用余弦调色还原干涉色，叠加 Fresnel 和高光。",
+prompt:"thin-film interference iridescent sphere, view-dependent cosine palette, fbm thickness, fresnel, specular",
+glsl:`void main(){${UV}vec3 ro=vec3(0,0,2.5),rd=normalize(vec3(uv,-1.6));float b=dot(ro,rd),c=dot(ro,ro)-.81,hh=b*b-c;
+vec3 col=vec3(.02,.02,.04);if(hh>0.){float t=-b-sqrt(hh);vec3 p=ro+rd*t,nn=normalize(p);float th=fbm(nn.xy*2.5+vec2(T*.15,T*.1))*1.5+nn.z*.3;float ct=dot(nn,-rd);
+vec3 ir=.5+.5*cos(6.2832*(th+ct*.8+vec3(0.,.33,.67)));float fr=pow(1.-ct,2.);col=ir*(.25+.9*fr)+vec3(pow(max(dot(reflect(rd,nn),normalize(vec3(.5,.6,1.))),0.),40.)*.8);}
+gl_FragColor=vec4(col,1.);}`},
+{id:"god",cat:"optics",nm:"体积光",en:"Volumetric god rays",ds:"光线穿过遮挡物散射",use:["P1"],useTxt:"P1 入口和展厅的主光",
+tech:"屏幕空间径向采样：从每个像素朝光源方向走 60 步，累积没被遮挡的亮度，形成光束。",
+prompt:"screen-space volumetric light scattering, radial sampling toward light, rotating occluder spokes, warm god rays",
+glsl:`float occ(vec2 p){float a=atan(p.y,p.x),r=length(p);return step(.22,r)*step(r,.5)*step(.15,sin(a*7.+T*.4+r*6.));}
+float lit(vec2 p){return smoothstep(.55,0.,length(p))*(1.-occ(p));}
+void main(){${UV}vec2 d=uv/60.,p=uv;float acc=0.,w=1.;for(int i=0;i<60;i++){acc+=lit(p)*w;w*=.97;p-=d;}
+vec3 col=vec3(1.,.8,.55)*acc*.05;col=mix(col,vec3(.03,.02,.02),occ(uv)*.85);col+=vec3(1.,.9,.7)*smoothstep(.2,0.,length(uv))*.6;gl_FragColor=vec4(1.-exp(-col*1.5),1.);}`},
+{id:"cau",cat:"optics",nm:"水波焦散",en:"Water caustics",ds:"折射光聚焦的光网",use:["P1","bg"],useTxt:"P1 展厅地面、水下氛围",
+tech:"多次迭代三角函数扭曲坐标，取倒数距离再求幂，得到水底那种会流动的焦散光网。",
+prompt:"tileable procedural water caustics, iterative trig warping, sharp bright filaments, cyan tint",
+glsl:`void main(){vec2 p=mod(gl_FragCoord.xy/R.y*6.2832,6.2832)-250.;vec2 i=p;float c=1.,inten=.005;
+for(int k=0;k<5;k++){float t=T*.5*(1.-(3.5/float(k+1)));i=p+vec2(cos(t-i.x)+sin(t+i.y),sin(t-i.y)+cos(t+i.x));c+=1./length(vec2(p.x/(sin(i.x+t)/inten),p.y/(cos(i.y+t)/inten)));}
+c/=5.;c=1.17-pow(c,1.4);vec3 col=vec3(pow(abs(c),8.));gl_FragColor=vec4(clamp(col+vec3(0.,.3,.45),0.,1.),1.);}`},
+{id:"pri",cat:"optics",nm:"棱镜色散",en:"Prism dispersion",ds:"白光分解成光谱",use:["P2"],useTxt:"P2 七身色彩的引子",
+tech:"等边三角棱镜用 SDF 描边，入射白光是一条发光线段，出射扇面按角度映射到波长色谱。",
+prompt:"triangular prism SDF outline, white beam in, spectral fan out, wavelength-to-RGB mapping, animated spread",
+glsl:`float tri(vec2 p,float r){const float k=1.7320508;p.x=abs(p.x)-r;p.y=p.y+r/k;if(p.x+k*p.y>0.)p=vec2(p.x-k*p.y,-k*p.x-p.y)/2.;p.x-=clamp(p.x,-2.*r,0.);return -length(p)*sign(p.y);}
+float seg(vec2 p,vec2 a,vec2 b){vec2 pa=p-a,ba=b-a;return length(pa-ba*clamp(dot(pa,ba)/dot(ba,ba),0.,1.));}
+vec3 spec(float k){return clamp(vec3(1.5-abs(4.*k-.5),1.5-abs(4.*k-2.),1.5-abs(4.*k-3.5)),0.,1.);}
+void main(){${UV}vec3 col=vec3(.01,.01,.02);float d=tri(uv,.32);col+=vec3(.6,.7,.8)*exp(-abs(d)*90.)+vec3(.05,.06,.08)*step(d,0.);
+col+=vec3(1.)*.004/max(seg(uv,vec2(-1.6,-.35),vec2(-.12,.02)),.002);vec2 E=vec2(.14,.02);
+if(uv.x>E.x){float a=atan(uv.y-E.y,uv.x-E.x),sp=.32+.08*sin(T*.6),a0=-.42,k=(a-a0)/sp;col+=spec(k)*smoothstep(0.,.06,k)*smoothstep(1.,.94,k)*.9*smoothstep(1.6,.2,length(uv-E));}
+gl_FragColor=vec4(1.-exp(-col*1.3),1.);}`},
+{id:"gla",cat:"optics",nm:"玻璃折射色散",en:"Chromatic glass refraction",ds:"三波长折射 + 反射",use:["P2"],useTxt:"P2 高阶身的透明质感",
+tech:"光线步进环面体，红绿蓝三个波长用不同折射率（1.35 / 1.5 / 1.65）折射，边缘自然分色，再叠加 Fresnel 反射。",
+prompt:"raymarched glass torus, per-channel refraction IOR 1.35/1.5/1.65, chromatic dispersion, fresnel reflection, striped environment",
+glsl:`float map(vec3 p){p.xz=rot(T*.5)*p.xz;p.xy=rot(T*.3)*p.xy;vec2 q=vec2(length(p.xz)-.55,p.y);return length(q)-.22;}
+vec3 bg(vec3 d){float s=smoothstep(-.2,.2,sin(d.x*14.+d.y*4.+T*.3));return mix(vec3(.08,.1,.2),vec3(.9,.85,.8),s)*(.6+.4*d.y);}
+void main(){${UV}vec3 ro=vec3(0,0,2.4),rd=normalize(vec3(uv,-1.6)),col=bg(rd);float t=0.;
+for(int i=0;i<64;i++){float d=map(ro+rd*t);if(d<.001||t>5.)break;t+=d;}
+if(t<5.){vec3 p=ro+rd*t;vec2 e=vec2(.001,0);vec3 nn=normalize(vec3(map(p+e.xyy)-map(p-e.xyy),map(p+e.yxy)-map(p-e.yxy),map(p+e.yyx)-map(p-e.yyx)));
+vec3 rc=vec3(bg(refract(rd,nn,1./1.35)).r,bg(refract(rd,nn,1./1.5)).g,bg(refract(rd,nn,1./1.65)).b);float fr=pow(1.-max(dot(-rd,nn),0.),3.);
+col=mix(rc*vec3(.9,.95,1.),bg(reflect(rd,nn)),fr*.8)+vec3(pow(max(dot(reflect(rd,nn),normalize(vec3(.5,.7,.6))),0.),50.));}
+gl_FragColor=vec4(col,1.);}`},
+{id:"int",cat:"optics",nm:"波干涉条纹",en:"Wave interference",ds:"全息照相原理",use:["P2"],useTxt:"P2 层与层之间的过渡；也可用于全息项目",
+tech:"三个移动点波源的余弦波叠加后取平方，就是干涉强度，也是全息记录的物理原理。",
+prompt:"three moving point sources, summed cosine waves squared, interference fringes, holographic iridescent tint",
+glsl:`void main(){${UV}vec2 s1=vec2(-.35+.1*sin(T*.3),0.),s2=vec2(.35,.1*cos(T*.4)),s3=vec2(0.,.4);
+float w=cos(60.*length(uv-s1)-T*4.)+cos(60.*length(uv-s2)-T*4.)+cos(60.*length(uv-s3)-T*4.);float I=w*w/9.;
+vec3 col=mix(vec3(.02,.02,.05),vec3(.6,.85,1.),I)+(.5+.5*cos(6.2832*(I+vec3(0.,.33,.67))))*.25*I;gl_FragColor=vec4(col,1.);}`},
+{id:"bh",cat:"optics",nm:"引力透镜",en:"Gravitational lensing",ds:"光线弯曲 + 吸积盘",use:["P1"],useTxt:"P1 「摧毁」的奇点意象",
+tech:"按爱因斯坦透镜公式偏折背景坐标，叠加有多普勒亮度差的吸积盘、被弯到上方的盘面和光子环。",
+prompt:"black hole gravitational lensing, einstein-ring deflection of starfield, doppler-beamed accretion disk, photon ring",
+glsl:`void main(){${UV}float r=length(uv);vec2 q=uv*(1.-.06/(r*r+.001));vec2 sq=q*1.5+vec2(T*.03,0.);
+vec3 col=vec3(step(.992,h(floor(sq*50.)))*.9)+vec3(.15,.08,.25)*fbm(sq*2.)*1.2;
+vec2 e=vec2(uv.x,uv.y*4.);float er=length(e);float disk=exp(-pow((er-.55)/.18,2.))*(1.+.7*uv.x/max(r,.01))*(.7+.3*n(vec2(atan(e.y,e.x)*6.-T*2.,er*10.)));
+vec3 dc=vec3(1.,.55,.2)*disk*.9;if(uv.y>0.)col+=dc;col*=smoothstep(.19,.21,r);if(uv.y<=0.)col+=dc;
+col+=vec3(1.,.6,.25)*exp(-pow((r-.24)/.02,2.))*.8*(.6+.4*sin(atan(uv.y,uv.x)+T));col+=vec3(1.,.8,.6)*exp(-pow((r-.205)/.006,2.))*.6;
+gl_FragColor=vec4(1.-exp(-col*1.4),1.);}`},
+{id:"rt",cat:"optics",nm:"实时光线追踪",en:"Real-time ray tracing",ds:"反射 + 阴影，3 次弹射",use:["P1"],useTxt:"P1 展品的镜面和金属材质",
+tech:"球体和地面用解析公式求交，最多 3 次反射弹射，带硬阴影和高光。",
+prompt:"analytic sphere and plane ray tracing, 3 reflection bounces, hard shadows, specular, checker floor, orbiting spheres",
+glsl:`vec4 sp(int i){float a=T*.6;if(i==0)return vec4(0.,0.,0.,.42);if(i==1)return vec4(cos(a)*.8,-.25,sin(a)*.8,.2);return vec4(cos(a+3.14)*.8,-.25,sin(a+3.14)*.8,.2);}
+vec3 sc(int i){if(i==0)return vec3(.95);if(i==1)return vec3(1.,.35,.2);return vec3(.2,.5,1.);}
+float isph(vec3 ro,vec3 rd,vec4 s){vec3 oc=ro-s.xyz;float b=dot(oc,rd),c=dot(oc,oc)-s.w*s.w,hh=b*b-c;if(hh<0.)return -1.;return -b-sqrt(hh);}
+bool shd(vec3 p,vec3 l){for(int i=0;i<3;i++){if(isph(p,l,sp(i))>0.)return true;}return false;}
+vec3 sky(vec3 d){return mix(vec3(.05,.06,.1),vec3(.35,.45,.7),clamp(d.y*.5+.5,0.,1.));}
+void main(){${UV}vec3 ro=vec3(0,.25,2.3),rd=normalize(vec3(uv,-1.6));rd.yz=rot(-.12)*rd.yz;float cy=T*.15;ro.xz=rot(cy)*ro.xz;rd.xz=rot(cy)*rd.xz;
+vec3 L=normalize(vec3(.6,.8,.4)),col=vec3(0.),mask=vec3(1.);
+for(int b=0;b<3;b++){float tm=1e9;int id=-1;for(int i=0;i<3;i++){float t=isph(ro,rd,sp(i));if(t>.001&&t<tm){tm=t;id=i;}}
+float tf=rd.y<0.?(-.45-ro.y)/rd.y:-1.;if(tf>.001&&tf<tm){tm=tf;id=3;}if(id<0){col+=mask*sky(rd);break;}
+vec3 p=ro+rd*tm,nn,base;float refl;if(id==3){nn=vec3(0,1,0);float ch=mod(floor(p.x*2.)+floor(p.z*2.),2.);base=mix(vec3(.15),vec3(.8),ch)*exp(-length(p.xz)*.15);refl=.25;}
+else{vec4 s=sp(id);nn=normalize(p-s.xyz);base=sc(id);refl=id==0?.85:.25;}
+float dif=max(dot(nn,L),0.);if(shd(p+nn*.002,L))dif*=.2;float spc=pow(max(dot(reflect(rd,nn),L),0.),60.);
+col+=mask*(base*(dif*.9+.08)*(1.-refl)+spc*.6);mask*=refl*mix(vec3(1.),base,.5);ro=p+nn*.002;rd=reflect(rd,nn);}
+gl_FragColor=vec4(col,1.);}`},
+{id:"net",cat:"lines",nm:"网光体网络",en:"Voronoi light network",ds:"Voronoi 网格 + 脉冲",use:["P2"],useTxt:"P2 网光体表面的网状结构",
+tech:"Voronoi 胞腔最近距离与次近距离之差（F2 − F1）画出网格边，节点随时间漂移，再叠一圈圈径向脉冲。",
+prompt:"animated voronoi F2-F1 edges, glowing nodes, radial energy pulse, cyan light network",
+glsl:`void main(){${UV}vec2 v=vor(uv*3.);float e=1.-smoothstep(0.,.04,v.y-v.x);float nd=exp(-v.x*v.x*120.);
+float pu=.5+.5*sin(length(uv)*8.-T*3.);vec3 col=vec3(.02,.03,.06)+vec3(.15,.6,.9)*e*(.4+.6*pu)+vec3(.6,.9,1.)*nd;gl_FragColor=vec4(col,1.);}`},
+{id:"lor",cat:"lines",nm:"奇异吸引子",en:"Lorenz attractor",ds:"Lorenz 微分方程轨迹",use:["P1"],useTxt:"P1 章节意象：混沌、蝴蝶效应",
+tech:"对 Lorenz 方程（σ = 10，ρ = 28，β = 8/3）做 8000 步数值积分，绕竖轴旋转投影，白点沿轨迹运动。",
+prompt:"Lorenz attractor sigma 10 rho 28 beta 8/3, euler integration 8000 steps, rotating projection, pink thin lines, moving head",
+js:"lor"},
+{id:"spi",cat:"lines",nm:"参数曲线",en:"Hypotrochoid",ds:"万花尺内旋轮线",use:["P1","bg"],useTxt:"装饰线、结构纹样、过场",
+tech:"内旋轮线 x = (R − r)cos t + d·cos((R − r)t / r)，取 R = 7、r = 3，笔尖距离 d 随时间变化。",
+prompt:"hypotrochoid R=7 r=3 animated pen distance, golden thin line, slow rotation",
+js:"spi"},
+{id:"flow",cat:"atmo",nm:"粒子流场",en:"Particle flow field",ds:"向量场驱动粒子",use:["P1","P2","bg"],useTxt:"P1 和 P2 通用的能量流、背景粒子",
+tech:"每个粒子按三角函数构成的向量场移动，每帧用半透明黑色覆盖，留下拖尾。",
+prompt:"particle flow field, trig vector field, trailing fade, teal particles; production: WebGPU compute curl-noise, 100k+ particles",
+js:"flow"},
+{id:"neb",cat:"atmo",nm:"星云域扭曲",en:"Domain-warped nebula",ds:"domain warping",use:["bg"],useTxt:"背景、章节氛围",
+tech:"两层 domain warping：先用 fbm 生成偏移，再拿偏移去扭曲下一层 fbm 的坐标，得到星云般的结构。",
+prompt:"two-level domain warped fbm, nebula, deep violet to pink with blue highlights",
+glsl:`void main(){vec2 p=(gl_FragCoord.xy*2.-R)/R.y*1.5;vec2 q=vec2(fbm(p+T*.05),fbm(p+5.2));vec2 r=vec2(fbm(p+4.*q+vec2(1.7,9.2)+T*.1),fbm(p+4.*q+8.3));
+float f=fbm(p+4.*r);vec3 col=mix(vec3(.05,.02,.12),vec3(.75,.25,.55),clamp(f*f*2.,0.,1.));col=mix(col,vec3(.2,.5,.9),clamp(length(q)*.5,0.,1.)*.5);col*=f*1.6;gl_FragColor=vec4(col,1.);}`},
+{id:"vol",cat:"atmo",nm:"体积光体",en:"Volumetric emissive body",ds:"3D 密度场体积积分",use:["P2"],useTxt:"P2 气态身、以太体",
+tech:"在球形区域里用 3D fbm 定义密度，按固定步长做体积积分，按半径混合由暖到冷的发光色。",
+prompt:"volumetric raymarch 3D fbm density inside sphere, emissive warm core to cool edge, front-to-back accumulation",
+glsl:`void main(){${UV}vec3 ro=vec3(0,0,2.5),rd=normalize(vec3(uv,-1.6)),col=vec3(0.);float a=0.,t=1.5;
+for(int i=0;i<40;i++){vec3 p=ro+rd*t;p.xz=rot(T*.2)*p.xz;float r=length(p);float den=clamp((f3(p*2.5+vec3(0,T*.4,0))-.35)*2.,0.,1.)*smoothstep(1.,.3,r);
+vec3 e=mix(vec3(1.,.45,.15),vec3(.3,.5,1.),smoothstep(.2,.9,r));col+=e*den*.09*(1.-a);a+=den*.06*(1.-a);t+=.05;}
+gl_FragColor=vec4(1.-exp(-col*2.),1.);}`},
+{id:"aur",cat:"atmo",nm:"极光帘幕",en:"Aurora curtains",ds:"分层噪声光带",use:["bg"],useTxt:"后记、结尾的天空",
+tech:"20 层波浪形基线，向上按指数衰减成光帘，再用高频噪声做出竖向光柱，颜色由绿过渡到紫。",
+prompt:"layered aurora curtains, fbm wavy baselines, exponential upward falloff, vertical ray noise, green to violet, starfield",
+glsl:`void main(){vec2 uv=gl_FragCoord.xy/R.y;vec3 col=vec3(.005,.01,.03)+vec3(.02,.04,.08)*uv.y+step(.996,h(floor(gl_FragCoord.xy)))*.6*uv.y;
+for(int i=0;i<20;i++){float fi=float(i)/20.;float base=.2+.25*fbm(vec2(uv.x*1.2+fi*.4+T*.04,fi*3.))+fi*.15;float dy=uv.y-base;
+float b=smoothstep(-.015,0.,dy)*exp(-max(dy,0.)*7.);col+=mix(vec3(.1,1.,.55),vec3(.55,.25,1.),fi)*b*(.5+.5*n(vec2(uv.x*40.+fi*13.,T*.3)))*.07;}
+gl_FragColor=vec4(1.-exp(-col*2.),1.);}`},
+{id:"arc",cat:"atmo",nm:"能量电弧",en:"Energy arc",ds:"fbm 闪电",use:["P1"],useTxt:"P1 冲击、摧毁的瞬间",
+tech:"用一维 fbm 当路径偏移，按 1 / 距离发光，每秒重采样 12 次，形成闪烁。",
+prompt:"fbm lightning between two orbs, inverse-distance glow, 12Hz flicker resampling, electric blue",
+glsl:`void main(){${UV}vec3 col=vec3(.01,.01,.03);float env=clamp(1.-pow(uv.x/1.1,2.),0.,1.),ft=floor(T*12.);
+for(int i=0;i<3;i++){float fi=float(i);float off=(fbm(vec2(uv.x*2.5+fi*7.,ft*.37+fi))-.5)*.9*env;col+=vec3(.45,.55,1.)*.006/max(abs(uv.y-off),.002)*env*(.6+.4*h(vec2(ft,fi)));}
+col+=vec3(.6,.7,1.)*(.03/length(uv-vec2(1.1,0.))+.03/length(uv+vec2(1.1,0.)));gl_FragColor=vec4(1.-exp(-col),1.);}`},
+{id:"dis",cat:"break",nm:"噪声溶解碎裂",en:"Noise dissolve and fracture",ds:"fbm 溶解 + Voronoi 裂纹",use:["P1"],useTxt:"P1 「摧毁只是一瞬间」的核心效果",
+tech:"fbm 噪声和一个随时间变化的阈值比较，决定哪里消失；阈值边缘发出橙色余烬光，表面叠 Voronoi 裂纹。",
+prompt:"fbm threshold dissolve, glowing ember edge, voronoi crack lines on stone surface, animated threshold",
+glsl:`void main(){${UV}float r=length(uv);float nn=fbm(uv*3.5);float th=.5+.45*sin(T*.5);float ins=smoothstep(.75,.73,r);
+float m=step(th,nn)*ins;vec2 v=vor(uv*5.);float cr=1.-smoothstep(0.,.03,v.y-v.x);vec3 surf=vec3(.75,.72,.68)*(.6+.4*fbm(uv*8.));surf*=1.-cr*.7;
+vec3 col=mix(vec3(.02,.02,.03),surf,m);col+=vec3(1.,.45,.1)*smoothstep(.05,0.,abs(nn-th))*ins*1.5;gl_FragColor=vec4(col,1.);}`},
+{id:"tes",cat:"break",nm:"四维超立方体",en:"Tesseract projection",ds:"4D 旋转投影",use:["P2"],useTxt:"P2 「多次元」概念的视觉隐喻",
+tech:"16 个四维顶点在 XW 和 YZ 平面里旋转，做 4D → 3D → 2D 两次透视投影；金色边在第四维的近侧，蓝色边在远侧。",
+prompt:"tesseract 16 vertices 32 edges, rotation in XW and YZ planes, double perspective projection 4D to 2D, gold near-w, blue far-w",
+js:"tes"}
+];
+
+
+const LZ=[];{let x=.1,y=0,z=0;for(let i=0;i<8000;i++){const dx=10*(y-x),dy=x*(28-z)-y,dz=x*y-8/3*z;x+=dx*.005;y+=dy*.005;z+=dz*.005;LZ.push([x,y,z])}}
+function make2D(kind,c,W,H){
+  const s=W/320,bg='#07090f';c.fillStyle=bg;c.fillRect(0,0,W,H);
+  if(kind==='lor')return t=>{c.fillStyle=bg;c.fillRect(0,0,W,H);const a=t*.3,ca=Math.cos(a),sa=Math.sin(a),k=H/58;
+    c.strokeStyle='rgba(237,147,177,.55)';c.lineWidth=.7*s;c.beginPath();
+    for(let i=0;i<LZ.length;i++){const p=LZ[i],X=W/2+(p[0]*ca+p[1]*sa)*k,Y=H/2-(p[2]-25)*k;i?c.lineTo(X,Y):c.moveTo(X,Y)}c.stroke();
+    const hp=LZ[Math.floor(Math.abs(t)*200)%LZ.length];c.fillStyle='#fff';c.beginPath();c.arc(W/2+(hp[0]*ca+hp[1]*sa)*k,H/2-(hp[2]-25)*k,2.5*s,0,7);c.fill()};
+  if(kind==='spi')return t=>{c.fillStyle=bg;c.fillRect(0,0,W,H);const R=7,r=3,d=1.5+1.4*Math.sin(t*.4),k=H*.45/(R-r+d);
+    c.strokeStyle='rgba(239,159,39,.85)';c.lineWidth=s;c.beginPath();
+    for(let i=0;i<=900;i++){const u=i/900*Math.PI*6,X=W/2+k*((R-r)*Math.cos(u+t*.1)+d*Math.cos((R-r)/r*u-t*.1)),Y=H/2+k*((R-r)*Math.sin(u+t*.1)-d*Math.sin((R-r)/r*u-t*.1));i?c.lineTo(X,Y):c.moveTo(X,Y)}c.stroke()};
+  if(kind==='tes'){const V=[],E=[];for(let i=0;i<16;i++)V.push([i&1?1:-1,i&2?1:-1,i&4?1:-1,i&8?1:-1]);
+    for(let i=0;i<16;i++)for(let j=i+1;j<16;j++){const x=i^j;if(!(x&(x-1)))E.push([i,j])}
+    return t=>{c.fillStyle=bg;c.fillRect(0,0,W,H);const a=t*.5,b=t*.3,cA=Math.cos(a),sA=Math.sin(a),cB=Math.cos(b),sB=Math.sin(b);
+      const P=V.map(([x,y,z,w])=>{let X=x*cA-w*sA,Wv=x*sA+w*cA,Y=y*cB-z*sB,Z=y*sB+z*cB;const k=1/(2.6-Wv);X*=k;Y*=k;Z*=k;const k2=1/(3-Z);return[W/2+X*k2*H*.95,H/2+Y*k2*H*.95,Wv]});
+      c.lineWidth=1.2*s;E.forEach(([i,j])=>{const w=(P[i][2]+P[j][2])/2;c.strokeStyle=w>0?'rgba(239,159,39,.9)':'rgba(133,183,235,.85)';c.beginPath();c.moveTo(P[i][0],P[i][1]);c.lineTo(P[j][0],P[j][1]);c.stroke()});
+      c.fillStyle='#fff';P.forEach(p=>{c.beginPath();c.arc(p[0],p[1],2*s,0,7);c.fill()})}}
+  const N=Math.min(6000,Math.round(900*W*H/(320*200))),ps=Array.from({length:N},()=>[Math.random()*W,Math.random()*H]);
+  let last=null;
+  return t=>{const dt=last===null?1:Math.max(0,Math.min(3,(t-last)*60));last=t;
+    c.fillStyle='rgba(7,9,15,.08)';c.fillRect(0,0,W,H);c.fillStyle='rgba(93,202,165,.9)';
+    for(const p of ps){const a=(Math.sin(p[0]*.008/s+t*.3)+Math.cos(p[1]*.01/s-t*.2))*Math.PI;p[0]+=Math.cos(a)*s*dt;p[1]+=Math.sin(a)*s*dt;
+      if(p[0]<0||p[0]>W||p[1]<0||p[1]>H||Math.random()<.004){p[0]=Math.random()*W;p[1]=Math.random()*H}c.fillRect(p[0],p[1],s,s)}}
+}
+
+
+window.FXLIB={PRE,UV,CATS,FX,make2D};
+})();

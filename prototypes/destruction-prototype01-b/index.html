@@ -1,0 +1,282 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>摧毀只是一瞬間 · Prototype 01</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{--border:rgba(255,255,255,.14);--border-strong:rgba(255,255,255,.28);--border-accent:#6ea8fe;--text-accent:#8bb9fe;--surface-1:#18181a;--text-primary:#f2f2f2;--text-secondary:#b4b4b4;--text-muted:#8a8a8a;--font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;color-scheme:dark}
+html,body{margin:0;background:#0d0d0e;color:var(--text-primary);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:960px;margin:0 auto;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button:focus-visible{outline:2px solid var(--border-accent);outline-offset:2px}
+button svg{vertical-align:-3px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+button{font:inherit;font-size:14px;color:var(--text-primary);background:transparent;border:0.5px solid var(--border-strong);border-radius:8px;height:36px;padding:0 12px;cursor:pointer}
+button:hover{background:rgba(255,255,255,.06)}
+.lbl{position:absolute;transform:translate(-50%,-100%);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:500;color:#f3ede2;background:rgba(10,10,10,.7);border:0.5px solid rgba(255,255,255,.3);cursor:pointer;white-space:nowrap;user-select:none}
+.lbl.on{background:#f3ede2;color:#111}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.nav button.on{border-color:var(--border-accent);color:var(--text-accent)}
+#wrap{position:relative;width:100%;height:min(75vh,640px);border-radius:12px;overflow:hidden;border:0.5px solid var(--border);touch-action:none}
+</style>
+
+<main>
+<h2 class="sr-only">Prototype 01: Intro photon plus A, B, C elements over scattered light vortices in a black void.</h2>
+<div id="wrap"></div>
+<div class="nav">
+<button id="b-ov" aria-label="Overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12H3l9-9 9 9h-2"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/><path d="M9 21v-6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6"/></svg></button>
+<button id="b-I">Intro</button><button id="b-A">A</button><button id="b-B">B</button><button id="b-C">C</button>
+<button id="b-re" aria-label="Replay sequence"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg></button>
+<button id="b-next">Next <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 18l6-6"/><path d="M13 6l6 6"/></svg></button>
+</div>
+<div style="margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--surface-1);">
+<div id="p-t" style="font-size:15px;font-weight:500;color:var(--text-primary);">Overview</div>
+<div id="p-c" style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);margin:2px 0 6px;">camera · free explore</div>
+<div id="p-d" style="font-size:14px;color:var(--text-secondary);line-height:1.6;">Tap a point, or press Next to walk Intro → A → B → C.</div>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+// ===== Renderer / scene / camera =====
+const wrap=document.getElementById('wrap');
+const W=()=>wrap.clientWidth,H=()=>wrap.clientHeight;
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(W(),H());
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;
+wrap.appendChild(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000);scene.fog=new THREE.Fog(0x000000,9,26);
+const camera=new THREE.PerspectiveCamera(42,W()/H(),0.1,100);
+const HOME={pos:new THREE.Vector3(0,4.6,11.8),tgt:new THREE.Vector3(0,.9,-.8)};
+camera.position.copy(HOME.pos);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.target.copy(HOME.tgt);controls.enableDamping=true;controls.dampingFactor=0.06;controls.enablePan=false;
+function limits(focus){controls.minDistance=focus?1.6:5;controls.maxDistance=focus?5:15;controls.minPolarAngle=focus?0.35:0.6;controls.maxPolarAngle=Math.PI/2-0.08;controls.minAzimuthAngle=focus?-Infinity:-Math.PI/3;controls.maxAzimuthAngle=focus?Infinity:Math.PI/3;}
+limits(false);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:0x050505,roughness:.9}));
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+scene.add(new THREE.AmbientLight(0xffffff,.08));
+
+// ===== Environment map for metal reflections =====
+const pmrem=new THREE.PMREMGenerator(renderer);
+const envScene=new THREE.Scene();
+envScene.add(new THREE.Mesh(new THREE.BoxGeometry(20,20,20),new THREE.MeshBasicMaterial({color:0x080808,side:THREE.BackSide})));
+[[0,8,0,12,2,-Math.PI/2,0],[-9,2,2,1.2,10,0,Math.PI/2],[9,3,-2,1.2,8,0,-Math.PI/2],[0,3,9.5,8,1.5,0,Math.PI]].forEach(([x,y,z,w,h,rx,ry])=>{
+const p=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(6,6,6),side:THREE.DoubleSide}));
+p.position.set(x,y,z);p.rotation.set(rx,ry,0);envScene.add(p);});
+const envTex=pmrem.fromScene(envScene,0.04).texture;
+
+// ===== Element A: extruded 3D logo (traced from 600x600 reference) =====
+const S=205,CX=310,CY=300,SW=32/S;
+const P=(x,y)=>new THREE.Vector2((x-CX)/S,-(y-CY)/S);
+function strokeShape(pts,wfn){
+const n=pts.length,L=[],R=[],N=[];
+for(let i=0;i<n;i++){const a=pts[Math.max(i-1,0)],b=pts[Math.min(i+1,n-1)];const t=b.clone().sub(a).normalize();const nm=new THREE.Vector2(-t.y,t.x);const w=wfn(i/(n-1))/2;N.push([nm,w]);L.push(pts[i].clone().addScaledVector(nm,w));R.push(pts[i].clone().addScaledVector(nm,-w));}
+const s=new THREE.Shape();s.moveTo(L[0].x,L[0].y);
+for(let i=1;i<n;i++)s.lineTo(L[i].x,L[i].y);
+let [ne,we]=N[n-1],ae=Math.atan2(ne.y,ne.x);
+for(let k=1;k<12;k++){const g=ae-Math.PI*k/12;s.lineTo(pts[n-1].x+Math.cos(g)*we,pts[n-1].y+Math.sin(g)*we);}
+for(let i=n-1;i>=0;i--)s.lineTo(R[i].x,R[i].y);
+let [ns,ws]=N[0],as=Math.atan2(ns.y,ns.x);
+for(let k=1;k<12;k++){const g=as+Math.PI-Math.PI*k/12;s.lineTo(pts[0].x+Math.cos(g)*ws,pts[0].y+Math.sin(g)*ws);}
+return s;}
+const arc=[];for(let d=148;d<=465;d+=6){const r=d*Math.PI/180;arc.push(P(CX+S*Math.cos(r),CY+S*Math.sin(r)));}
+const s1=arc.concat([P(228,484),P(210,455),P(206,420),P(214,385),P(240,310),P(266,240),P(292,182)]);
+const strokes=[
+{pts:new THREE.SplineCurve(s1).getSpacedPoints(260),w:t=>SW*(t<.07?.2+.8*t/.07:1)},
+{pts:new THREE.SplineCurve([P(292,182),P(312,215),P(340,290),P(366,360),P(386,410)]).getSpacedPoints(80),w:()=>SW*.95},
+{pts:new THREE.SplineCurve([P(278,350),P(310,345),P(338,355),P(360,378),P(380,408)]).getSpacedPoints(60),w:t=>SW*.82*(t<.25?.6+.4*t/.25:1)}];
+const logoMat=new THREE.MeshPhysicalMaterial({color:0xd9c39a,metalness:1,roughness:.22,clearcoat:.6,clearcoatRoughness:.15,envMap:envTex,envMapIntensity:1.3,emissive:0xfff1dc,emissiveIntensity:0});
+function buildLogo(){const g=new THREE.Group();
+strokes.forEach((st,i)=>{const geo=new THREE.ExtrudeGeometry(strokeShape(st.pts,st.w),{depth:.14,bevelEnabled:true,bevelThickness:.045,bevelSize:.035,bevelSegments:6,curveSegments:8});
+geo.translate(0,0,-.07+i*.004);const m=new THREE.Mesh(geo,logoMat);m.castShadow=true;m.userData.key='A';g.add(m);});
+g.scale.setScalar(.6);return g;}
+
+// ===== Shared helpers =====
+const TAU=Math.PI*2,rnd=Math.random;
+const lineMat=op=>new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:op,depthWrite:false,blending:THREE.AdditiveBlending});
+function segGeo(pos,col){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+const GLH='float h(float n){return fract(sin(n)*43758.5453);}vec3 spec(float x){float hu=0.76-0.76*clamp(x,0.0,1.0);return clamp(abs(mod(hu*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0);}';
+const FRAG='varying vec3 vC;void main(){gl_FragColor=vec4(vC,1.0);}';
+const uT={value:0};
+function shaderLines(attrs,count,vs,uni){
+const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(count*3),3));
+Object.entries(attrs).forEach(([k,[arr,sz]])=>g.setAttribute(k,new THREE.Float32BufferAttribute(arr,sz)));
+const m=new THREE.ShaderMaterial({uniforms:uni,vertexShader:vs,fragmentShader:FRAG,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
+const L=new THREE.LineSegments(g,m);L.frustumCulled=false;return L;}
+function filamentAttrs(N,SEG,rf){const U=[],PA=[],QA=[];
+for(let f=0;f<N;f++){const [r,sp,spd,life]=rf(),a=rnd()*TAU,seed=rnd()*100;
+for(let s=0;s<SEG;s++)[s/SEG,(s+1)/SEG].forEach(u=>{U.push(u);PA.push(r,a,sp,seed);QA.push(spd,life);});}
+return {aU:[U,1],aP:[PA,4],aQ:[QA,2]};}
+function rayAttrs(N,rf){const E=[],PA=[],QA=[];
+for(let i=0;i<N;i++){const [r,d,len,life,drift]=rf(),a=rnd()*TAU,seed=rnd()*100;
+[0,1].forEach(e=>{E.push(e);PA.push(r,a,d,len);QA.push(seed,life,drift);});}
+return {aE:[E,1],aP:[PA,4],aQ:[QA,3]};}
+
+// ===== Background: random GPU vortex field =====
+(()=>{const at=filamentAttrs(1700,18,()=>[1.9+13*Math.pow(rnd(),1.25),.25+rnd()*1.7,(.03+rnd()*.08)*(rnd()<.14?-1:1),3+rnd()*11]);
+const vs=`attribute float aU;attribute vec4 aP;attribute vec2 aQ;uniform float uT;varying vec3 vC;${GLH}
+void main(){float seed=aP.w,life=aQ.y,tt=uT+seed*life,cyc=floor(tt/life),ph=fract(tt/life);
+float r=aP.x*(0.8+0.4*h(cyc*7.1+seed*13.3));float a=aP.y+h(cyc*3.7+seed*5.1)*6.2831;
+float span=aP.z*(0.5+h(cyc*1.3+seed));float spd=aQ.x*(3.0/(1.0+r*0.35));float ang=a+span*aU-uT*spd;
+float rr=r*(1.0-0.1*aU*h(seed*2.3))+sin(ang*2.0+uT*0.35+seed*9.0)*0.3+sin(ang*7.0-uT*0.9+seed*3.0)*0.06*sqrt(r);
+vec2 c=vec2(sin(uT*0.07+seed)*0.5,cos(uT*0.05+seed*2.0)*0.5);
+vec3 p=vec3(c.x+cos(ang)*rr,0.006+sin(aU*3.14159)*0.03*h(seed*4.1),c.y+sin(ang)*rr);
+float env=sin(3.14159*ph);env*=env;float fl=0.55+0.45*sin(uT*(1.0+h(seed)*5.0)+seed*20.0);
+vC=vec3(0.55*sin(3.14159*aU)*env*fl*(0.25+0.75*h(seed*9.0))*smoothstep(16.0,8.0,rr)*smoothstep(1.4,2.4,rr));
+gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);}`;
+const L=shaderLines(at,at.aU[0].length,vs,{uT});L.position.set(0,0,-1.2);scene.add(L);})();
+// Background: drifting straight streaks
+(()=>{const at=rayAttrs(320,()=>[3+12*rnd(),Math.PI/2+(rnd()-.5)*1.6,.8+rnd()*2.6,2.5+rnd()*6,.6+rnd()*2]);
+const vs=`attribute float aE;attribute vec4 aP;attribute vec3 aQ;uniform float uT;varying vec3 vC;${GLH}
+void main(){float seed=aQ.x,life=aQ.y,tt=uT+seed*life,cyc=floor(tt/life),ph=fract(tt/life);
+float a=aP.y+h(cyc+seed)*6.2831,r=aP.x*(0.7+0.6*h(cyc*2.0+seed*1.7)),dir=a+aP.z+(h(cyc*5.0+seed)-0.5)*0.8;
+vec2 dv=vec2(cos(dir),sin(dir));vec2 p0=vec2(cos(a),sin(a))*r+dv*ph*aQ.z;vec2 p=p0+dv*aP.w*(0.4+0.6*h(cyc*9.0+seed))*aE;
+vC=vec3(0.5*sin(3.14159*ph)*(1.0-aE*0.85)*(0.3+0.7*h(seed*3.0))*smoothstep(16.0,9.0,length(p)));
+gl_Position=projectionMatrix*modelViewMatrix*vec4(p.x,0.008,p.y,1.0);}`;
+const L=shaderLines(at,at.aE[0].length,vs,{uT});L.position.set(0,0,-1.2);scene.add(L);})();
+
+// ===== Element bases: scattered spectral light vortex =====
+const BASE_FIL=`attribute float aU;attribute vec4 aP;attribute vec2 aQ;uniform float uT,uG,uS;varying vec3 vC;${GLH}
+void main(){float seed=aP.w,life=aQ.y,tt=uT+seed*life,cyc=floor(tt/life),ph=fract(tt/life);
+float r=aP.x*(0.7+0.6*h(cyc*7.1+seed*13.3));float a=aP.y+h(cyc*3.7+seed*5.1)*6.2831;
+float span=aP.z*(0.4+1.2*h(cyc*1.3+seed));float spd=aQ.x*(1.2/(0.25+r));float ang=a+span*aU-uT*spd;
+float rr=max(0.05,r*(1.0-0.25*aU*h(seed*2.3))+sin(ang*3.0+uT*0.6+seed*9.0)*0.07+sin(ang*9.0-uT*1.4+seed*3.0)*0.025);
+float fun=pow(max(0.0,0.55-rr)/0.45,1.6)*0.9*(0.35+0.65*h(seed*5.7+cyc));
+float y=0.01+fun+sin(aU*3.14159)*0.08*h(seed*4.1+cyc)*(h(cyc*2.2+seed)>0.7?1.0:0.2);
+vec3 p=vec3(cos(ang)*rr,y,sin(ang)*rr);
+float env=sin(3.14159*ph);env*=env;float fl=0.5+0.5*sin(uT*(1.5+h(seed)*6.0)+seed*20.0);
+float b=0.95*sin(3.14159*aU)*env*fl*(0.25+0.75*h(seed*9.0))*smoothstep(1.9,1.1,rr)*uG*uS;
+vC=mix(vec3(1.0),spec(rr/1.6),0.32)*b;
+gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);}`;
+const BASE_RAY=`attribute float aE;attribute vec4 aP;attribute vec3 aQ;uniform float uT,uG,uS;varying vec3 vC;${GLH}
+void main(){float seed=aQ.x,life=aQ.y,tt=uT+seed*life,cyc=floor(tt/life),ph=fract(tt/life);
+float a=aP.y+h(cyc+seed)*6.2831,r0=aP.x*(0.3+0.7*h(cyc*2.0+seed*1.7));float dir=a+aP.z*(h(cyc*5.0+seed)-0.5);
+vec2 dv=vec2(cos(dir),sin(dir));float trav=ph*aQ.z,len=aP.w*(0.3+0.7*h(cyc*9.0+seed));
+vec2 p=vec2(cos(a),sin(a))*r0+dv*(trav+len*aE);
+float lift=(h(cyc*4.3+seed)-0.35)*0.5;float y=max(0.01,0.02+lift*(trav+len*aE)*0.5);
+float d=length(p);float b=0.8*sin(3.14159*ph)*(1.0-aE*0.9)*(0.3+0.7*h(seed*3.0))*smoothstep(2.3,1.0,d)*uG*uS;
+vC=mix(vec3(1.0),spec(d/1.8),0.3)*b;
+gl_Position=projectionMatrix*modelViewMatrix*vec4(p.x,y,p.y,1.0);}`;
+function buildBase(x,z,uG,sc,uS){const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(sc);
+const fa=filamentAttrs(520,14,()=>[.1+1.5*Math.pow(rnd(),1.1),.3+rnd()*1.6,(.15+rnd()*.35)*(rnd()<.2?-1:1),2+rnd()*6]);
+g.add(shaderLines(fa,fa.aU[0].length,BASE_FIL,{uT,uG,uS}));
+const ra=rayAttrs(190,()=>[.15+rnd()*.5,1.4,.25+rnd()*.9,1.2+rnd()*3,.4+rnd()*1.1]);
+g.add(shaderLines(ra,ra.aE[0].length,BASE_RAY,{uT,uG,uS}));
+scene.add(g);return g;}
+
+// ===== Intro: photon =====
+const tex=(f)=>{const c=document.createElement('canvas');c.width=c.height=128;f(c.getContext('2d'));return new THREE.CanvasTexture(c);};
+const glowTex=tex(g=>{const r=g.createRadialGradient(64,64,0,64,64,64);r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.12,'rgba(255,250,240,.85)');r.addColorStop(.35,'rgba(255,235,210,.25)');r.addColorStop(1,'rgba(255,230,200,0)');g.fillStyle=r;g.fillRect(0,0,128,128);});
+const streakTex=tex(g=>{const r=g.createLinearGradient(0,0,128,0);r.addColorStop(0,'rgba(180,200,255,0)');r.addColorStop(.5,'rgba(255,255,255,1)');r.addColorStop(1,'rgba(180,200,255,0)');g.fillStyle=r;g.fillRect(0,56,128,16);
+const v=g.getImageData(0,0,128,128);for(let y=0;y<128;y++){const k=Math.exp(-Math.pow((y-64)/5,2));for(let x=0;x<128;x++){v.data[(y*128+x)*4+3]*=k;}}g.putImageData(v,0,0);});
+const sprite=(t,s,o)=>{const m=new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:o});const sp=new THREE.Sprite(m);sp.scale.set(s[0],s[1],1);return sp;};
+const NW=240;
+const hits=[];
+function buildPhoton(){
+const g=new THREE.Group();
+const core=new THREE.Mesh(new THREE.SphereGeometry(.055,24,24),new THREE.MeshBasicMaterial({color:0xffffff}));g.add(core);
+const halo=sprite(glowTex,[.7,.7],1),halo2=sprite(glowTex,[2.2,2.2],.35),streak=sprite(streakTex,[2.6,.22],.8);
+g.add(halo,halo2,streak);
+const hit=new THREE.Mesh(new THREE.SphereGeometry(.4,12,12),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));hit.userData.key='I';g.add(hit);hits.push(hit);
+const wave=new THREE.Group();g.add(wave);
+const mk=()=>{const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(NW*3),3));geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(NW*3),3));const l=new THREE.Line(geo,lineMat(1));wave.add(l);return l;};
+const E=mk(),M=mk(),E2=mk();
+const light=new THREE.PointLight(0xfff4e6,1.4,4,2);g.add(light);
+g.userData={core,halo,halo2,streak,wave,E,M,E2,light};return g;}
+function updatePhoton(g,t,gain){const u=g.userData;
+const pulse=.85+.15*Math.sin(t*9)+.08*Math.sin(t*23);
+u.halo.scale.setScalar(.7*pulse*gain);u.halo2.material.opacity=.3*gain;u.streak.scale.set(2.6*gain*(.9+.1*Math.sin(t*3)),.22,1);u.streak.material.opacity=.75*gain;u.light.intensity=1.4*pulse*gain;
+u.wave.rotation.set(Math.sin(t*.3)*.35,t*.35,Math.sin(t*.21)*.2);
+[[u.E,0,1,.24],[u.M,1,0,.24],[u.E2,0,1,.12]].forEach(([l,ay,az,amp],idx)=>{const pa=l.geometry.attributes.position.array,ca=l.geometry.attributes.color.array;const c=new THREE.Color();
+for(let i=0;i<NW;i++){const s=i/(NW-1),x=-1.25+2.5*s,env=Math.exp(-x*x/.22),ph=x*15-t*7+(idx===2?Math.PI:0),w=Math.sin(ph)*amp*env*(idx===2?1.6:1);
+pa[i*3]=x;pa[i*3+1]=ay?w:0;pa[i*3+2]=az?w:0;
+c.setHSL(.76-.76*s,1,.62);const b=env*gain*(idx===2?.35:1);const m=idx===1?.25:.55;
+ca[i*3]=(1-m+m*c.r)*b;ca[i*3+1]=(1-m+m*c.g)*b;ca[i*3+2]=(1-m+m*c.b)*b;}
+l.geometry.attributes.position.needsUpdate=true;l.geometry.attributes.color.needsUpdate=true;});}
+
+// ===== Background: flickering vertical wisps + hanging beam =====
+const wisps=[];
+for(let gi=0;gi<8;gi++){const pos=[],col=[];
+for(let i=0;i<7;i++){const a=rnd()*TAU,r=4.5+rnd()*9,x=Math.cos(a)*r,z=Math.sin(a)*r-1.2;
+const hgt=.2+rnd()*.6;for(let k=0;k<4+Math.floor(rnd()*4);k++){const ox=(rnd()-.5)*.1,oz=(rnd()-.5)*.1,hh=hgt*(.3+rnd()*.7);pos.push(x+ox,0,z+oz,x+ox*.4+(rnd()-.5)*.04,hh,z+oz*.4);col.push(.9,.9,.9,0,0,0);}}
+const L=new THREE.LineSegments(segGeo(pos,col),lineMat(.6));L.userData={ph:rnd()*10,f:.6+rnd()*2.2};scene.add(L);wisps.push(L);}
+scene.add(new THREE.LineSegments(segGeo([1.8,2.6,-1.8,1.8,16,-1.8],[.5,.5,.5,0,0,0]),lineMat(.6)));
+
+// ===== Points: Intro, A, B, C =====
+const POINTS={
+I:{name:'Intro',p:[0,0,4],photon:true,title:'Intro · 光子',desc:'A single photon: a bright core with its electric and magnetic wave packet. The opening of the museum.'},
+A:{name:'A',p:[-2.4,0,1.2],build:buildLogo,title:'Element A · 立体 Logo',desc:'Bevelled metal A logo floating over a scattered light vortex.'},
+B:{name:'B',p:[1.8,0,-1.8],geo:new THREE.SphereGeometry(.7,64,64),c:0x1a1a1a,title:'Element B · 章节 02（占位）',desc:'Placeholder content for point B.'},
+C:{name:'C',p:[-.6,0,-5],geo:new THREE.TorusKnotGeometry(.55,.18,160,24),c:0xcfc8bc,title:'Element C · 章节 03（占位）',desc:'Placeholder content for point C.'}};
+const ORDER=['I','A','B','C'],labels={};
+ORDER.forEach(k=>{
+const Pt=POINTS[k],[x,y,z]=Pt.p;Pt.uG={value:.75};Pt.uS={value:0};Pt.show={v:0};Pt.gain={v:.8};buildBase(x,z,Pt.uG,k==='I'?.6:1,Pt.uS);
+let obj,mat=null;
+if(Pt.photon){obj=buildPhoton();}
+else if(Pt.build){obj=Pt.build();mat=logoMat;obj.traverse(o=>{if(o.isMesh)hits.push(o);});}
+else{mat=new THREE.MeshStandardMaterial({color:Pt.c,roughness:k==='B'?.25:.35,metalness:k==='B'?.6:.2,envMap:envTex,emissive:0xffffff,emissiveIntensity:0});obj=new THREE.Mesh(Pt.geo,mat);obj.castShadow=true;obj.userData.key=k;hits.push(obj);}
+obj.position.set(x,k==='I'?1.15:k==='A'?1.65:k==='B'?1.4:1.5,z);scene.add(obj);Pt.obj=obj;Pt.mat=mat;Pt.baseY=obj.position.y;Pt.s0=obj.scale.x;obj.scale.setScalar(.0001);
+if(!Pt.photon){const s=new THREE.SpotLight(0xffffff,1.6,14,.32,.6,1.4);s.position.set(x,7,z+2);s.target=obj;s.castShadow=true;s.shadow.mapSize.set(1024,1024);s.shadow.bias=-.0005;s.intensity=0;Pt.spot=s;scene.add(s);}
+const el=document.createElement('div');el.className='lbl';el.textContent=Pt.name+'  ('+x+', '+y+', '+z+')';
+el.addEventListener('click',e=>{e.stopPropagation();go(k);});wrap.appendChild(el);labels[k]=el;});
+const sweep=new THREE.PointLight(0xffffff,1.8,5,2);scene.add(sweep);
+const rim=new THREE.PointLight(0xffffff,1.4,6,2);rim.position.set(-2.4,2.4,-.2);scene.add(rim);
+
+// ===== Sequence: light trail travels point to point, each element appears in turn =====
+const TRAIL_N=300,curve=new THREE.CatmullRomCurve3(ORDER.map(k=>new THREE.Vector3(POINTS[k].p[0],.02,POINTS[k].p[2])));
+const tPts=curve.getPoints(TRAIL_N),tPos=[],tCol=[];
+tPts.forEach((p,i)=>{tPos.push(p.x,p.y,p.z);const b=.35+.25*Math.sin(i*.9);tCol.push(b,b*.97,b*.92);});
+const trailLine=new THREE.Line(segGeo(tPos,tCol),lineMat(.9));trailLine.geometry.setDrawRange(0,0);trailLine.frustumCulled=false;scene.add(trailLine);
+const spark=sprite(glowTex,[.9,.9],0);scene.add(spark);
+const trail={v:0};let seqTL=null;
+function reveal(){if(seqTL)seqTL.kill();trail.v=0;ORDER.forEach(k=>{POINTS[k].show.v=0;});
+seqTL=gsap.timeline();seqTL.to(POINTS.I.show,{v:1,duration:1.4,ease:'power3.out'},.4);
+for(let i=1;i<ORDER.length;i++){const t0=1.4+(i-1)*1.7;
+seqTL.to(trail,{v:i,duration:1.1,ease:'power1.inOut'},t0).to(POINTS[ORDER[i]].show,{v:1,duration:1.3,ease:'power3.out'},t0+.85);}}
+
+// ===== Interaction: select / fly / inspect =====
+let current=null,busy=false;
+const OVD='Tap a point, press Next to walk Intro → A → B → C, or ↻ to replay the sequence.';
+const ui=(t,c,d)=>{document.getElementById('p-t').textContent=t;document.getElementById('p-c').textContent=c;document.getElementById('p-d').textContent=d;
+['ov',...ORDER].forEach(k=>document.getElementById('b-'+k).classList.toggle('on',(current||'ov')===k));
+ORDER.forEach(k=>{const Pt=POINTS[k];labels[k].classList.toggle('on',current===k);if(Pt.mat)gsap.to(Pt.mat,{emissiveIntensity:current===k?(k==='C'?.1:.03):0,duration:.6});gsap.to(Pt.uG,{value:current===k?1.15:.75,duration:.8});gsap.to(Pt.gain,{v:current===k?1.25:.8,duration:.8});});};
+function fly(pos,tgt,focus,done){busy=true;controls.enabled=false;
+gsap.timeline({onComplete:()=>{limits(focus);controls.enabled=true;busy=false;done&&done();}})
+.to(camera.position,{x:pos.x,y:pos.y,z:pos.z,duration:1.6,ease:'power2.inOut'},0)
+.to(controls.target,{x:tgt.x,y:tgt.y,z:tgt.z,duration:1.6,ease:'power2.inOut',onUpdate:()=>camera.lookAt(controls.target)},0);}
+function go(k){if(busy||k===current)return;const Pt=POINTS[k],[x,,z]=Pt.p;current=k;
+ui(Pt.title,Pt.name+' · ('+Pt.p.join(', ')+') · moving…',Pt.desc);limits(true);
+const d=k==='I'?2.4:3.4,hy=k==='I'?1.7:2.4;
+fly(new THREE.Vector3(x,hy,z+d),new THREE.Vector3(x,Pt.baseY-(k==='I'?.1:.35),z),true,()=>{document.getElementById('p-c').textContent=Pt.name+' · ('+Pt.p.join(', ')+') · inspect';});}
+function overview(){if(busy||!current)return;current=null;ui('Overview','camera · free explore',OVD);controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;fly(HOME.pos,HOME.tgt,false);}
+ORDER.forEach(k=>document.getElementById('b-'+k).onclick=()=>go(k));
+document.getElementById('b-ov').onclick=overview;
+document.getElementById('b-re').onclick=reveal;
+document.getElementById('b-next').onclick=()=>{const i=current?ORDER.indexOf(current):-1;go(ORDER[(i+1)%ORDER.length]);};
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+renderer.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;
+const r=renderer.domElement.getBoundingClientRect();ptr.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+ray.setFromCamera(ptr,camera);const h=ray.intersectObjects(hits)[0];if(h)go(h.object.userData.key);});
+ui('Overview','camera · free explore',OVD);
+reveal();
+
+// ===== Render loop =====
+const v=new THREE.Vector3(),clock=new THREE.Clock();
+(function loop(){const t=clock.getElapsedTime();uT.value=t;
+wisps.forEach(L=>{const s=Math.sin(t*L.userData.f+L.userData.ph);L.material.opacity=.05+.65*Math.max(0,s*s*s);});
+ORDER.forEach((k,i)=>{const Pt=POINTS[k],o=Pt.obj,sv=Pt.show.v;o.position.y=Pt.baseY+Math.sin(t*.8+i)*.05-(1-sv)*.7;
+o.scale.setScalar(Math.max(.0001,Pt.s0*sv));o.visible=sv>.001;Pt.uS.value=sv;if(Pt.spot)Pt.spot.intensity=1.6*sv;
+if(k==='I')updatePhoton(o,t,Pt.gain.v*sv);else if(k==='A')o.rotation.y=Math.sin(t*.45)*.55;else o.rotation.y=t*.25+i;});
+sweep.position.set(-2.4+Math.sin(t*.9)*1.6,2.2+Math.cos(t*.6)*.3,2.3);sweep.intensity=1.8*POINTS.A.show.v;rim.intensity=1.4*POINTS.A.show.v;
+trailLine.geometry.setDrawRange(0,Math.floor(trail.v*TRAIL_N/(ORDER.length-1))+1);
+const fr=trail.v%1;spark.material.opacity=trail.v>0&&trail.v<ORDER.length-1||fr>0?Math.sin(Math.PI*fr):0;spark.position.copy(curve.getPoint(Math.min(trail.v/(ORDER.length-1),1))).setY(.06);
+if(controls.enabled)controls.update();
+ORDER.forEach(k=>{v.copy(POINTS[k].obj.position);v.y+=k==='I'?.55:1.05;v.project(camera);const el=labels[k];
+el.style.left=((v.x+1)/2*W())+'px';el.style.top=((1-v.y)/2*H())+'px';el.style.opacity=v.z<1?POINTS[k].show.v:0;el.style.pointerEvents=POINTS[k].show.v>.5?'auto':'none';});
+renderer.render(scene,camera);requestAnimationFrame(loop);})();
+new ResizeObserver(()=>{renderer.setSize(W(),H());camera.aspect=W()/H();camera.updateProjectionMatrix();}).observe(wrap);
+</script>
+
+</body></html>

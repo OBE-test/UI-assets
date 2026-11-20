@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Awakenology 泡泡画廊</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* night sky of bubbles; chrome is faint glass pills, content cards float over foam */
+  --bg:#05060a;
+  --text:#e9edf3;
+  --muted:#8a93a3;
+  --glass:rgba(12,15,23,.78);
+  --line:rgba(170,200,255,.16);
+  --accent:#bfe3ff;
+  --f-ui:"IBM Plex Sans","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--f-ui);font-size:13px}
+#stage{position:fixed;inset:0;touch-action:none}
+#stage canvas{display:block}
+#foam{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;display:none}
+.hd{position:fixed;top:18px;left:20px;pointer-events:none}
+.hd h1{margin:0;font-size:13px;font-weight:500;letter-spacing:.02em}
+.hd p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.paths{position:fixed;left:20px;bottom:20px;display:flex;flex-direction:column;gap:6px}
+.btn{font:inherit;font-size:12px;color:var(--text);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer;text-align:left}
+.btn:hover{border-color:rgba(190,220,255,.4)}
+.btn[aria-pressed="true"]{background:var(--accent);color:#0a0d14;border-color:var(--accent)}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pals{position:fixed;top:16px;right:20px;display:flex;gap:6px}
+.sizes{position:fixed;top:56px;right:20px;display:flex;gap:6px}
+.modes{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);display:flex;gap:6px}
+.ver{position:fixed;right:20px;bottom:22px;font-family:var(--f-mono);font-size:11px;color:var(--muted);pointer-events:none}
+.lbl{position:fixed;left:0;top:0;transform:translate(-50%,0);pointer-events:none;text-align:center;white-space:nowrap;opacity:0;transition:opacity .35s}
+.lbl b{display:block;font-weight:500;font-size:12px}
+.lbl span{font-size:11px;color:var(--muted)}
+.panel{position:fixed;left:50%;top:50%;transform:translate(-50%,-46%);width:min(420px,calc(100% - 32px));background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:22px 22px 18px;display:none;gap:10px;opacity:0;transition:opacity .4s,transform .4s}
+.panel.show{opacity:1;transform:translate(-50%,-50%)}
+.panel .k{font-family:var(--f-mono);font-size:11px;color:var(--accent);letter-spacing:.06em}
+.panel h2{margin:0;font-size:20px;font-weight:500;text-wrap:balance}
+.panel p{margin:0;color:var(--muted);line-height:1.65}
+.panel .row{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.panel a.go{font:inherit;font-size:12px;text-decoration:none;color:#0a0d14;background:var(--accent);border-radius:999px;padding:7px 14px}
+.panel .soon{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:999px;padding:6px 14px}
+.err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--muted)}
+@media (max-width:640px){.paths{flex-direction:row;flex-wrap:wrap;right:20px;bottom:64px}.modes{bottom:16px}}
+</style>
+</head>
+<body>
+<div id="stage" aria-label="沿曲线流动的泡泡画廊"></div>
+<canvas id="foam" aria-hidden="true"></canvas>
+<div class="hd"><h1>Awakenology 泡泡画廊</h1><p id="hint">点击轨迹进入 · 点亮着的泡泡打开内容</p></div>
+<nav class="paths" aria-label="曲线">
+  <button class="btn" data-path="0" aria-pressed="false">三叶结</button>
+  <button class="btn" data-path="1" aria-pressed="false">利萨如</button>
+  <button class="btn" data-path="2" aria-pressed="false">环面结</button>
+  <button class="btn" data-path="3" aria-pressed="false">双纽线</button>
+  <button class="btn" data-path="4" aria-pressed="false">环波</button>
+  <button class="btn" data-path="5" aria-pressed="false">徽章 · 双轨</button>
+  <button class="btn" data-path="6" aria-pressed="true">徽章 · 单轨</button>
+</nav>
+<div class="sizes" role="group" aria-label="泡泡大小">
+  <button class="btn" data-size="0" aria-pressed="false">整体放大</button>
+  <button class="btn" data-size="1" aria-pressed="false">珍珠渐变</button>
+  <button class="btn" data-size="2" aria-pressed="true">疏朗大泡</button>
+</div>
+<div class="pals" role="group" aria-label="配色">
+  <button class="btn" data-pal="0" aria-pressed="true">极光冷调</button>
+  <button class="btn" data-pal="1" aria-pressed="false">粉彩高阶</button>
+  <button class="btn" data-pal="2" aria-pressed="false">混搭</button>
+</div>
+<div class="modes">
+  <button class="btn" id="overview" aria-pressed="true">总览</button>
+  <button class="btn" id="mode" aria-pressed="false">Scroll</button>
+</div>
+<div class="ver">v2.6 · 晃动减半</div>
+<div id="labels"></div>
+<section class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="pTitle">
+  <span class="k" id="pKey"></span>
+  <h2 id="pTitle"></h2>
+  <p id="pDesc"></p>
+  <div class="row" id="pRow"></div>
+</section>
+<div class="err" id="err">这个浏览器无法运行 WebGL，画廊无法显示。</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   1. CONFIG：可调参数
+   ============================================================ */
+const CONFIG = {
+  TOTAL: 520,                 // 装饰泡泡数量（组成珠链）
+  CAM_Z: 10, FOV: 60,
+  FOCUS_DIST: 5, MAX_SCALE: 3.2, Z_GATE: 11,   // 镜头附近的泡泡放大（比方块版温和）
+  LATERAL: 0.22, DEPTH: 0.3,  // 泡泡偏离曲线的范围：小，才能排成珠链
+  BUBBLE_D: 0.72,             // 泡泡基础直径（固定，不随曲线长短变化，方便单轨/双轨对照）
+  SIZE_VAR: [0.55, 1.45],
+  SIZE_MODE: 2,               // 0 整体放大，1 珍珠渐变，2 疏朗大泡
+  AIRY: { count: 150, d: 1.75, vary: [0.85, 1.15] },                  // E：只留 150 颗大泡，等距留白
+  BOLD: { d: 1.25, vary: [0.8, 1.2], lateral: 0.15 },                 // B：直径 1.25，大小统一
+  PEARL: { d: 1.15, waves: 9, min: 0.55, max: 1.45, lateral: 0.12 },  // C：沿路径 9 个渐大渐小的波
+  FLOW_SPEED: 0.004,          // 珠链沿曲线流动的速度（每秒走全长的比例）
+  BREATH: 0.07,               // 呼吸胀缩幅度
+  WOBBLE: { amp: 0.21, depth: 0.6, speed: [0.12, 0.32], scatter: 0.38, slide: 0.35 },
+  // 晃动：amp 上下左右漂移幅度，depth 前后漂移幅度，speed 漂移频率范围（Hz），scatter 疏朗模式下的静态横向错位，slide 沿路径的静态前后错位（占间距比例）
+  SCALE_EASE: 0.4, CAM_EASE: 1.0, MORPH_TIME: 1.4,
+  SENSITIVITY: 0.8, AUTO_LOOP_SECONDS: 40,
+  FOG: [10, 40], BG: 0x05060a,
+  CONTENT_SCALE: 3.4,         // 内容泡泡比装饰泡泡大多少
+  FOAM_TIME: 1.1,             // 泡沫转场时长（秒）
+  PALETTE: 0,                 // 0 极光冷调，1 粉彩高阶，2 混搭
+  START_PATH: 6, START_IN_OVERVIEW: true, OVERVIEW_EASE: 1.4, OVERVIEW_MARGIN: 1.25,
+  SEED: 20261118
+};
+
+/* ============================================================
+   2. 内容：每一项就是曲线上的一个内容泡泡
+   以后加页面：在这里加一行；url 留空 = 显示「即将上线」
+   ============================================================ */
+const CONTENT = [
+  { key: 'LIB', title: '光学渲染效果库', sub: '22 个纯数学实时效果', desc: '形体、光学、结构线、氛围、破坏五类效果，全部由公式实时算出，可以预览、调速、复制源码。', url: 'https://claude.ai/artifact/1Fo39v7VDqdxmZ6c5LzMRp', hue: .55 },
+  { key: 'M0', title: '光学画廊 M0', sub: 'SDF 展厅原型', desc: '穹顶、肋拱、三扇拱门和反光地面都是数学公式；点画框可以走进画里。', url: 'https://claude.ai/artifact/N9TZaBEhAdF2y7SixULXbz', hue: .08 },
+  { key: 'P1', title: '摧毀只是一瞬間', sub: 'P1 · 互动艺术馆', desc: '把原文改造成沉浸式互动艺术馆：入口、展厅、序言、A/B/C 章节、结尾、后记。', url: '', hue: .02 },
+  { key: 'P2', title: '人的多次元複合體結構', sub: 'P2 · 單重複合體', desc: '从肉體到最后一层，一层层剥开的 3D 光体结构。', url: '', hue: .62 },
+  { key: 'FX', title: '曲线画廊 · 效果版', sub: '早期实验', desc: '效果库的 22 个效果沿数学曲线排开，镜头前的作品自动放大。', url: 'https://claude.ai/artifact/HgF2Vi2KeaYovhXZEvuSnT', hue: .33 }
+];
+
+/* ============================================================
+   3. 曲线
+   ============================================================ */
+const TAU = Math.PI * 2;
+const CURVES = [
+  u => [5 * (Math.sin(u) + 2 * Math.sin(2 * u)), 5 * (Math.cos(u) - 2 * Math.cos(2 * u)), -14 * Math.sin(3 * u)],
+  u => [14 * Math.sin(3 * u), 10 * Math.sin(2 * u), 14 * Math.sin(u + 0.6)],
+  u => { const r = 10 + 4 * Math.cos(3 * u); return [r * Math.cos(2 * u), r * Math.sin(2 * u), 12 * Math.sin(3 * u)]; },
+  u => { const d = 1 + Math.sin(u) ** 2; return [17 * Math.cos(u) / d, 20 * Math.sin(u) * Math.cos(u) / d, 14 * Math.sin(u)]; },
+  u => { const r = 12 + 2.5 * Math.cos(7 * u); return [r * Math.cos(u), r * Math.sin(u), 9 * Math.sin(7 * u + 0.5)]; },
+  'badge',
+  'badge1'
+];
+/* 徽章：Wikimedia Commons File:Atheismsymbol_endorsed_by_AAI.svg（CC0），沿轮廓均匀取 480 点 */
+const BADGE = `-0.3,-15 -0.9,-14.9 -1.5,-14.9 -2.1,-14.7 -2.7,-14.6 -3.3,-14.4 -3.8,-14.2 -4.4,-13.9 -4.9,-13.6 -5.4,-13.3 -5.9,-13 -6.4,-12.6 -6.8,-12.1 -7.2,-11.7 -7.6,-11.2 -7.9,-10.7 -8.1,-10.1 -8.3,-9.5 -8.4,-8.9 -8.4,-8.3 -8.4,-7.7 -8.3,-7.1 -8.2,-6.5 -8.1,-5.9 -8,-5.3 -7.8,-4.7 -7.6,-4.1 -7.4,-3.5 -7.2,-3 -7,-2.4 -6.8,-1.8 -6.5,-1.3 -6.3,-0.7 -6.1,-0.1 -5.9,0.4 -5.6,1 -5.4,1.6 -5.1,2.1 -4.9,2.7 -4.7,3.2 -4.4,3.8 -4.2,4.4 -3.9,4.9 -3.7,5.5 -3.4,6 -3.2,6.6 -2.9,7.2 -2.7,7.7 -2.4,8.3 -2.2,8.8 -1.9,9.4 -1.7,9.9 -1.4,10.5 -1.2,11.1 -0.9,11.6 -0.7,12.2 -0.4,12.7 0.1,13.1 0.7,13 1,12.5 1.2,11.9 1.3,11.3 1.5,10.7 1.6,10.1 1.8,9.5 1.9,8.9 2.1,8.3 2.2,7.7 2.4,7.1 2.5,6.6 2.7,6 2.8,5.4 3,4.8 3.1,4.2 3.3,3.6 3.4,3 3.6,2.4 3.7,1.8 3.9,1.2 4,0.6 4.2,0 4.3,-0.6 4.5,-1.1 4.6,-1.7 4.8,-2.3 4.9,-2.9 5,-3.5 5.2,-4.1 5.3,-4.7 5.5,-5.3 5.6,-5.9 5.8,-6.5 6,-7.1 6.1,-7.7 6.3,-8.2 6.4,-8.8 6.6,-9.4 6.7,-10 6.6,-10.6 6,-10.8 5.5,-10.6 5.2,-10 4.9,-9.5 4.6,-9 4.3,-8.4 4,-7.9 3.7,-7.4 3.3,-6.9 3,-6.4 2.6,-5.9 2.2,-5.5 1.7,-5 1.3,-4.6 0.8,-4.3 0.3,-3.9 -0.2,-3.6 -0.8,-3.3 -1.3,-3.1 -1.9,-2.8 -2.5,-2.6 -3,-2.4 -3.6,-2.2 -3.4,-2.1 -2.8,-2.1 -2.2,-2.3 -1.6,-2.4 -1,-2.6 -0.5,-2.8 0.1,-3 0.6,-3.3 1.2,-3.6 1.7,-4 2.1,-4.3 2.6,-4.7 3,-5.2 3.5,-5.6 3.9,-6.1 4.2,-6.6 4.6,-7.1 4.9,-7.4 4.7,-6.8 4.5,-6.2 4.4,-5.6 4.2,-5 4.1,-4.4 3.9,-3.8 3.7,-3.3 3.6,-2.7 3.4,-2.1 3.3,-1.5 3.1,-0.9 3,-0.3 2.8,0.3 2.7,0.9 2.5,1.5 2.4,2.1 2.2,2.6 2,3.2 1.9,3.8 1.7,4.4 1.6,5 1.4,5.6 1.3,6.2 1.1,6.8 1,7.4 0.8,8 0.7,8.6 0.5,9.1 0.4,9.7 0.2,10.3 0,10.4 -0.3,9.8 -0.5,9.2 -0.8,8.7 -1,8.1 -1.3,7.6 -1.5,7 -1.8,6.5 -2,5.9 -2.2,5.3 -2.5,4.8 -2.7,4.2 -3,3.7 -3.2,3.1 -3.5,2.5 -3.7,2 -4,1.4 -4.2,0.9 -4.4,0.3 -4.7,-0.3 -4.9,-0.8 -5.1,-1.4 -5.3,-2 -5.6,-2.5 -5.8,-3.1 -6,-3.7 -6.2,-4.3 -6.4,-4.8 -6.6,-5.4 -6.7,-6 -6.9,-6.6 -7,-7.2 -7,-7.8 -7.1,-8.4 -7,-9 -6.9,-9.6 -6.6,-10.2 -6.3,-10.7 -5.9,-11.2 -5.5,-11.6 -5,-12 -4.5,-12.3 -4,-12.6 -3.4,-12.9 -2.8,-13.1 -2.3,-13.3 -1.7,-13.5 -1.1,-13.6 -0.5,-13.6 0.1,-13.6 0.8,-13.6 1.4,-13.6 2,-13.6 2.6,-13.5 3.2,-13.4 3.8,-13.2 4.4,-13.1 5,-12.9 5.5,-12.7 6.1,-12.5 6.7,-12.3 7.2,-12 7.7,-11.6 8.2,-11.3 8.7,-10.9 9.1,-10.5 9.6,-10.1 10,-9.6 10.4,-9.2 10.8,-8.7 11.2,-8.2 11.5,-7.7 11.8,-7.2 12.1,-6.7 12.4,-6.1 12.7,-5.6 12.9,-5 13.1,-4.4 13.3,-3.8 13.4,-3.3 13.5,-2.7 13.6,-2.1 13.7,-1.5 13.8,-0.8 13.8,-0.2 13.8,0.4 13.8,1 13.7,1.6 13.6,2.2 13.5,2.8 13.4,3.4 13.2,4 13,4.6 12.8,5.1 12.6,5.7 12.3,6.3 12,6.8 11.7,7.3 11.4,7.8 11,8.3 10.7,8.8 10.3,9.3 9.9,9.7 9.4,10.2 9,10.6 8.5,11 8,11.3 7.5,11.7 7,12 6.5,12.3 6,12.6 5.4,12.9 4.8,13.1 4.3,13.3 3.7,13.5 3.1,13.7 2.5,13.8 1.9,13.9 1.3,14 0.7,14.1 0.1,14.1 -0.5,14.1 -1.1,14.1 -1.8,14 -2.4,14 -3,13.9 -3.6,13.8 -4.2,13.6 -4.7,13.4 -5.3,13.2 -5.9,13 -6.4,12.8 -7,12.5 -7.5,12.2 -8,11.9 -8.5,11.5 -9,11.1 -9.5,10.7 -9.9,10.3 -10.3,9.9 -10.8,9.4 -11.1,9 -11.5,8.5 -11.8,8 -12.2,7.4 -12.5,6.9 -12.7,6.4 -13,5.8 -13.2,5.3 -13.5,4.7 -13.7,4.1 -13.8,3.5 -14,2.9 -14.1,2.3 -14.2,1.7 -14.3,1.1 -14.4,0.5 -14.5,-0.1 -14.5,-0.7 -14.5,-1.3 -14.4,-1.9 -14.4,-2.5 -14.3,-3.1 -14.2,-3.7 -14.1,-4.3 -13.9,-4.9 -13.7,-5.5 -13.5,-6.1 -13.2,-6.6 -12.9,-7.1 -12.6,-7.7 -12.4,-8.2 -12.1,-8.8 -11.8,-9.3 -11.5,-9.8 -11.2,-10.4 -11.5,-10 -11.8,-9.5 -12.2,-9 -12.5,-8.5 -12.8,-7.9 -13.1,-7.4 -13.4,-6.9 -13.7,-6.4 -14,-5.8 -14.2,-5.2 -14.4,-4.7 -14.5,-4.1 -14.7,-3.5 -14.8,-2.9 -14.9,-2.3 -14.9,-1.7 -14.9,-1.1 -15,-0.4 -14.9,0.2 -14.9,0.8 -14.8,1.4 -14.7,2 -14.6,2.6 -14.5,3.2 -14.4,3.8 -14.2,4.4 -14,4.9 -13.8,5.5 -13.6,6.1 -13.3,6.6 -13,7.2 -12.8,7.7 -12.4,8.3 -12.1,8.8 -11.8,9.3 -11.4,9.8 -11,10.2 -10.6,10.7 -10.2,11.1 -9.7,11.5 -9.2,11.9 -8.8,12.3 -8.3,12.6 -7.7,13 -7.2,13.3 -6.7,13.5 -6.1,13.8 -5.5,14 -5,14.2 -4.4,14.4 -3.8,14.6 -3.2,14.7 -2.6,14.8 -2,14.9 -1.4,15 -0.8,15 -0.2,15 0.4,15 1.1,14.9 1.7,14.9 2.3,14.8 2.9,14.7 3.5,14.6 4,14.4 4.6,14.2 5.2,14 5.8,13.8 6.3,13.5 6.9,13.2 7.4,13 7.9,12.6 8.4,12.3 8.9,11.9 9.4,11.6 9.9,11.2 10.3,10.8 10.8,10.3 11.2,9.9 11.6,9.4 11.9,8.9 12.3,8.4 12.6,7.9 12.9,7.4 13.2,6.9 13.5,6.3 13.8,5.8 14,5.2 14.2,4.6 14.4,4 14.5,3.4 14.7,2.8 14.8,2.2 14.9,1.6 14.9,1 14.9,0.4 15,-0.2 14.9,-0.8 14.9,-1.4 14.8,-2 14.8,-2.6 14.7,-3.2 14.5,-3.8 14.4,-4.4 14.2,-5 14,-5.6 13.7,-6.1 13.5,-6.7 13.2,-7.2 12.9,-7.8 12.6,-8.3 12.3,-8.8 11.9,-9.3 11.6,-9.8 11.2,-10.2 10.7,-10.7 10.3,-11.1 9.9,-11.6 9.4,-12 8.9,-12.3 8.4,-12.7 7.9,-13 7.4,-13.3 6.9,-13.6 6.3,-13.9 5.7,-14 5.1,-14.2 4.5,-14.4 4,-14.5 3.4,-14.7 2.8,-14.8 2.2,-14.9 1.6,-14.9 0.9,-15 0.3,-15`;
+/* 单轨徽章：对同一个 SVG 做光栅化 + 骨架化，求出笔画中心线，再沿中心线均匀取 360 点。
+   这是一条开放曲线：从圆圈左下的尾巴起笔 → 顺时针绕圆 → 流进 A 的圆底 → 左腿 → 顶点 → 右腿 → 横画末端 */
+const BADGE_SINGLE = `-11.30,-10.30 -11.51,-9.94 -11.71,-9.58 -11.91,-9.22 -12.12,-8.86 -12.32,-8.51 -12.53,-8.15 -12.73,-7.79 -12.95,-7.44 -13.15,-7.08 -13.35,-6.71 -13.53,-6.35 -13.71,-5.97 -13.87,-5.59 -14.01,-5.21 -14.14,-4.82 -14.25,-4.42 -14.36,-4.02 -14.44,-3.62 -14.53,-3.21 -14.58,-2.80 -14.64,-2.40 -14.68,-1.98 -14.70,-1.57 -14.72,-1.16 -14.72,-0.75 -14.72,-0.34 -14.70,0.08 -14.67,0.49 -14.64,0.90 -14.59,1.31 -14.53,1.72 -14.46,2.12 -14.39,2.53 -14.30,2.93 -14.20,3.33 -14.09,3.73 -13.98,4.13 -13.85,4.52 -13.72,4.91 -13.57,5.29 -13.42,5.68 -13.25,6.05 -13.08,6.43 -12.90,6.80 -12.71,7.17 -12.50,7.52 -12.30,7.88 -12.08,8.23 -11.85,8.57 -11.61,8.91 -11.36,9.24 -11.10,9.56 -10.84,9.88 -10.57,10.19 -10.28,10.49 -9.99,10.78 -9.69,11.06 -9.38,11.34 -9.06,11.60 -8.73,11.85 -8.40,12.09 -8.06,12.32 -7.71,12.54 -7.35,12.74 -6.99,12.94 -6.62,13.12 -6.24,13.29 -5.86,13.46 -5.48,13.61 -5.09,13.75 -4.70,13.89 -4.31,14.00 -3.91,14.11 -3.51,14.21 -3.10,14.30 -2.70,14.36 -2.29,14.42 -1.88,14.48 -1.47,14.50 -1.06,14.53 -0.65,14.55 -0.23,14.57 0.18,14.55 0.59,14.53 1.00,14.50 1.41,14.47 1.82,14.41 2.23,14.35 2.63,14.27 3.03,14.17 3.44,14.08 3.83,13.98 4.23,13.86 4.62,13.72 5.00,13.57 5.39,13.42 5.76,13.25 6.14,13.08 6.51,12.90 6.87,12.70 7.23,12.50 7.58,12.28 7.93,12.05 8.27,11.82 8.60,11.57 8.92,11.31 9.23,11.05 9.54,10.77 9.84,10.49 10.13,10.20 10.43,9.91 10.70,9.60 10.97,9.29 11.23,8.96 11.48,8.64 11.72,8.30 11.95,7.96 12.17,7.61 12.38,7.25 12.59,6.90 12.78,6.53 12.96,6.16 13.13,5.79 13.29,5.40 13.44,5.02 13.58,4.63 13.71,4.24 13.83,3.85 13.93,3.45 14.02,3.04 14.10,2.64 14.18,2.23 14.23,1.83 14.27,1.42 14.31,1.00 14.33,0.59 14.34,0.18 14.35,-0.23 14.34,-0.64 14.32,-1.06 14.29,-1.47 14.25,-1.88 14.19,-2.29 14.13,-2.69 14.06,-3.10 13.96,-3.50 13.85,-3.90 13.75,-4.30 13.62,-4.69 13.49,-5.08 13.34,-5.47 13.19,-5.85 13.02,-6.23 12.84,-6.60 12.66,-6.97 12.46,-7.33 12.25,-7.68 12.03,-8.03 11.81,-8.38 11.57,-8.72 11.32,-9.05 11.06,-9.37 10.80,-9.69 10.53,-10.00 10.25,-10.30 9.97,-10.60 9.66,-10.88 9.35,-11.15 9.04,-11.42 8.71,-11.67 8.38,-11.92 8.05,-12.17 7.71,-12.40 7.36,-12.61 7.00,-12.82 6.63,-13.01 6.25,-13.16 5.86,-13.30 5.47,-13.42 5.07,-13.54 4.67,-13.64 4.28,-13.76 3.88,-13.86 3.48,-13.96 3.07,-14.03 2.67,-14.11 2.26,-14.17 1.85,-14.21 1.44,-14.25 1.03,-14.27 0.61,-14.29 0.20,-14.29 -0.21,-14.27 -0.62,-14.25 -1.03,-14.22 -1.44,-14.17 -1.85,-14.09 -2.25,-14.00 -2.65,-13.90 -3.04,-13.77 -3.43,-13.62 -3.80,-13.45 -4.17,-13.26 -4.53,-13.07 -4.88,-12.85 -5.22,-12.62 -5.55,-12.37 -5.87,-12.11 -6.18,-11.84 -6.47,-11.55 -6.74,-11.23 -6.98,-10.90 -7.19,-10.54 -7.38,-10.17 -7.51,-9.78 -7.62,-9.39 -7.69,-8.98 -7.73,-8.57 -7.74,-8.16 -7.72,-7.75 -7.68,-7.33 -7.61,-6.93 -7.54,-6.52 -7.46,-6.12 -7.35,-5.72 -7.25,-5.32 -7.13,-4.92 -7.01,-4.53 -6.88,-4.14 -6.75,-3.75 -6.62,-3.36 -6.48,-2.97 -6.33,-2.58 -6.18,-2.20 -6.03,-1.81 -5.88,-1.43 -5.73,-1.04 -5.58,-0.66 -5.42,-0.28 -5.26,0.10 -5.11,0.48 -4.95,0.86 -4.79,1.24 -4.63,1.62 -4.46,2.00 -4.30,2.38 -4.13,2.76 -3.97,3.14 -3.81,3.52 -3.65,3.90 -3.49,4.28 -3.32,4.65 -3.16,5.03 -2.99,5.41 -2.82,5.79 -2.65,6.16 -2.48,6.54 -2.31,6.92 -2.14,7.29 -1.98,7.67 -1.80,8.04 -1.64,8.42 -1.47,8.80 -1.30,9.17 -1.13,9.55 -0.96,9.93 -0.79,10.30 -0.62,10.68 -0.45,11.05 -0.11,11.28 0.26,11.43 0.61,11.21 0.76,10.83 0.87,10.43 0.97,10.04 1.08,9.64 1.18,9.24 1.28,8.84 1.38,8.44 1.48,8.04 1.58,7.64 1.68,7.24 1.78,6.84 1.89,6.44 1.99,6.04 2.09,5.64 2.19,5.24 2.30,4.84 2.40,4.44 2.50,4.04 2.60,3.64 2.70,3.24 2.80,2.84 2.90,2.44 3.00,2.04 3.10,1.64 3.21,1.24 3.31,0.84 3.41,0.44 3.52,0.04 3.62,-0.36 3.72,-0.76 3.82,-1.16 3.92,-1.56 4.02,-1.96 4.13,-2.35 4.23,-2.75 4.33,-3.15 4.43,-3.55 4.54,-3.95 4.64,-4.35 4.75,-4.75 4.85,-5.15 4.96,-5.55 5.07,-5.94 5.17,-6.34 5.28,-6.74 5.35,-7.15 5.40,-7.56 5.42,-7.97 5.38,-8.35 5.54,-8.73 5.69,-9.12 5.83,-9.50 5.99,-9.89 6.05,-10.28 6.02,-9.97 5.87,-9.59 5.72,-9.20 5.57,-8.82 5.41,-8.43 5.20,-8.10 4.83,-7.92 4.47,-7.73 4.24,-7.39 4.00,-7.05 3.76,-6.72 3.51,-6.39 3.25,-6.07 2.98,-5.75 2.71,-5.45 2.42,-5.15 2.13,-4.86 1.83,-4.58 1.51,-4.31 1.18,-4.06 0.84,-3.83 0.49,-3.61 0.13,-3.41 -0.24,-3.23 -0.61,-3.05 -0.99,-2.88 -1.37,-2.74 -1.76,-2.60 -2.16,-2.48 -2.55,-2.37 -2.95,-2.26 -3.35,-2.16 -3.75,-2.06`;
+function buildCurve(def) {
+  const pts = [];
+  if (def === 'badge1') {
+    const xy = BADGE_SINGLE.trim().split(/\s+/).map(s => s.split(',').map(Number));
+    xy.forEach(([x, y], i) => pts.push(new THREE.Vector3(x, y, 2.5 * Math.sin(i / xy.length * TAU * 3))));
+    const c = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+    c.arcLengthDivisions = 1200; c.updateArcLengths(); return c;
+  }
+  if (def === 'badge') {
+    const xy = BADGE.trim().split(/\s+/).map(s => s.split(',').map(Number));
+    xy.forEach(([x, y], i) => pts.push(new THREE.Vector3(x, y, 2.5 * Math.sin(i / xy.length * TAU * 3))));
+  } else for (let i = 0; i < 720; i++) { const p = def(i / 720 * TAU); pts.push(new THREE.Vector3(p[0], p[1], p[2])); }
+  const c = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
+  c.arcLengthDivisions = 1200; c.updateArcLengths();
+  return c;
+}
+const curves = CURVES.map(buildCurve);
+const lens = curves.map(c => c.getLength());
+const tmpP = new THREE.Vector3(), tmpT = new THREE.Vector3();
+function placeOn(c, t, lateral, depth, out) {        // 曲线上 t 处的位置 + 横向/纵深偏移
+  c.getPointAt(t, tmpP); c.getTangentAt(t, tmpT);
+  const l = Math.hypot(tmpT.x, tmpT.y) || 1;
+  return out.set(tmpP.x - tmpT.y / l * lateral, tmpP.y + tmpT.x / l * lateral, tmpP.z + depth);
+}
+
+/* ============================================================
+   4. 渲染器、场景、镜头
+   ============================================================ */
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+catch (e) { document.getElementById('err').style.display = 'flex'; throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.getElementById('stage').appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(CONFIG.BG);
+const camera = new THREE.PerspectiveCamera(CONFIG.FOV, innerWidth / innerHeight, 0.1, 400);
+
+/* ============================================================
+   5. 泡泡：一个 InstancedMesh 画全部泡泡
+   片元着色器里用数学把方块变成球：圆形裁切 + 球面法线 + 薄膜干涉 + Fresnel + 高光
+   ============================================================ */
+let seed = CONFIG.SEED;
+const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+const N = CONFIG.TOTAL, C = CONTENT.length, ALL = N + C;
+const bubbles = [];
+for (let i = 0; i < N; i++) bubbles.push({ t0: i / N, lat: rnd() * 2 - 1, dep: (rnd() * 2 - 1) * CONFIG.DEPTH,
+  rB: CONFIG.BOLD.vary[0] + rnd() * (CONFIG.BOLD.vary[1] - CONFIG.BOLD.vary[0]), rC: 0.9 + rnd() * 0.2,
+  ph: rnd() * TAU, scale: 1, kind: 0, pos: new THREE.Vector3() });
+for (let i = 0; i < N; i++) {                       // 疏朗模式：从 520 颗里均匀挑出 150 颗做「领头」，移到等距位置
+  const k = Math.floor(i * CONFIG.AIRY.count / N), b = bubbles[i];
+  b.lead = i === 0 || k !== Math.floor((i - 1) * CONFIG.AIRY.count / N); b.tE = k / CONFIG.AIRY.count;
+  b.rE = CONFIG.AIRY.vary[0] + rnd() * (CONFIG.AIRY.vary[1] - CONFIG.AIRY.vary[0]);
+  b.tE += (rnd() - .5) * CONFIG.WOBBLE.slide / CONFIG.AIRY.count;   // 打乱等距：每颗前后错开一点
+  b.sc = rnd() * 2 - 1;                                              // 静态横向错位
+  const W = CONFIG.WOBBLE.speed, sp = () => (W[0] + rnd() * (W[1] - W[0])) * TAU;
+  b.wf = [sp(), sp(), sp()]; b.wp = [rnd() * TAU, rnd() * TAU, rnd() * TAU, rnd() * TAU, rnd() * TAU, rnd() * TAU];
+}
+CONTENT.forEach((c, k) => bubbles.push({ t0: (k + 0.5) / C, lat: 0, dep: 0.6, size: CONFIG.BUBBLE_D * CONFIG.CONTENT_SCALE, ph: rnd() * TAU, scale: 1, kind: 1, content: k, pos: new THREE.Vector3() }));
+
+/* 物理薄膜干涉：Belcour & Barla, SIGGRAPH 2017（three.js / Babylon.js 的 iridescence 用的同一模型）
+   d = 膜厚（纳米），c1 = 视线与法线夹角余弦；配色只在物理亮度之上做色域映射 */
+const THINFILM = `#define PI 3.14159265
+float pw5(float x){float x2=x*x;return x2*x2*x;}
+const mat3 X2R=mat3(3.2404542,-0.9692660,0.0556434,-1.5371385,1.8760108,-0.2040259,-0.4985314,0.0415560,1.0572252);
+vec3 sens(float OPD,vec3 sh){float ph=2.*PI*OPD*1e-9;vec3 val=vec3(5.4856e-13,4.4201e-13,5.2481e-13),pos=vec3(1.6810e+06,1.7953e+06,2.2084e+06),vr=vec3(4.3278e+09,9.3046e+09,6.6121e+09);
+ vec3 xyz=val*sqrt(2.*PI*vr)*cos(pos*ph+sh)*exp(-ph*ph*vr);xyz.x+=9.7470e-14*sqrt(2.*PI*4.5282e+09)*cos(2.2399e+06*ph+sh.x)*exp(-4.5282e+09*ph*ph);return X2R*(xyz/1.0685e-7);}
+vec3 irid(float c1,float d){float eta=1.33;float c2=sqrt(1.-(1.-c1*c1)/(eta*eta));
+ float R0=pow((eta-1.)/(eta+1.),2.);float R12=R0+(1.-R0)*pw5(1.-c1);float T121=1.-R12;float R23=R0+(1.-R0)*pw5(1.-c2);
+ float OPD=2.*eta*d*c2;vec3 phi=vec3(2.*PI);float R123=clamp(R12*R23,1e-5,.9999);float r123=sqrt(R123);float Rs=T121*T121*R23/(1.-R123);
+ vec3 I=vec3(R12+Rs);float Cm=Rs-T121;for(int m=1;m<=2;m++){Cm*=r123;I+=Cm*2.*sens(float(m)*OPD,float(m)*phi);}return max(I,0.);}
+float envL(vec3 r){float top=smoothstep(.45,.95,r.y);float win=smoothstep(.16,0.,abs(r.x-.42))*smoothstep(.22,0.,abs(r.y-.22));return top*1.4+win*3.+smoothstep(-.2,-.9,r.y)*.25+.06;}
+vec3 bubbleShade(vec3 nn,float sd,float tm,float pal){
+ vec3 r=reflect(vec3(0,0,-1),nn);float lit=.35+2.2*envL(r);
+ if(pal<.5){
+  float d=mix(200.,800.,smoothstep(-1.,1.,-nn.y))+200.*(fbm(nn.xy*2.5+vec2(sd*7.,tm*.12))-.5);
+  vec3 c=irid(nn.z,d);float l=dot(c,vec3(.3,.59,.11));float hue=fract(d/520.+fbm(nn.xy*3.+sd)*.3);
+  vec3 pc=mix(mix(vec3(.15,.95,.85),vec3(.25,.45,1.),smoothstep(0.,.5,hue)),vec3(.7,.35,1.),smoothstep(.5,1.,hue));
+  return pc*l*1.6*lit;}
+ float d=1000.+450.*fbm(nn.xy*2.+vec2(sd*7.,tm*.1))+300.*(-nn.y);
+ vec3 c=irid(nn.z,d)*lit;vec3 g=vec3(dot(c,vec3(.299,.587,.114)));return max(mix(g,c,1.25),0.);}
+`;
+const geo = new THREE.PlaneGeometry(1, 1);
+const aSeed = new Float32Array(ALL), aKind = new Float32Array(ALL), aHue = new Float32Array(ALL);
+bubbles.forEach((b, i) => { aSeed[i] = rnd(); aKind[i] = b.kind; aHue[i] = b.kind ? CONTENT[b.content].hue : 0; });
+geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(aSeed, 1));
+geo.setAttribute('aKind', new THREE.InstancedBufferAttribute(aKind, 1));
+geo.setAttribute('aHue', new THREE.InstancedBufferAttribute(aHue, 1));
+const mat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uTime: { value: 0 }, uFog: { value: new THREE.Vector2(...CONFIG.FOG) }, uLit: { value: 1 }, uPal: { value: CONFIG.PALETTE } },
+  vertexShader: `
+    attribute float aSeed, aKind, aHue; varying vec2 vL; varying float vSeed, vKind, vHue, vDepth, vDim;
+    void main(){ vL = uv; vSeed = aSeed; vKind = aKind; vHue = aHue; vDim = 1.;
+      #ifdef USE_INSTANCING_COLOR
+      vDim = instanceColor.r;
+      #endif
+      vec4 mv = modelViewMatrix * instanceMatrix * vec4(position, 1.); vDepth = -mv.z; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `
+    uniform float uTime, uLit, uPal; uniform vec2 uFog; varying vec2 vL; varying float vSeed, vKind, vHue, vDepth, vDim;
+    float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+    float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*n(p);p*=2.;a*=.5;}return v;}
+    ${THINFILM}
+    void main(){
+      vec2 q = vL * 2. - 1.; float r2 = dot(q, q); if (r2 > 1.) discard; float r = sqrt(r2);
+      vec3 nn = vec3(q, sqrt(1. - r2)); float fr = pow(1. - nn.z, 2.2);
+      float pal = uPal < 1.5 ? uPal : vKind;                                      // 0 极光冷调，1 粉彩高阶，2 混搭（装饰=极光，内容=粉彩）
+      vec3 c = bubbleShade(nn, vSeed, uTime, pal);                                // Belcour–Barla 物理薄膜干涉
+      if (vKind > .5) {                                                           // 内容泡泡：里面装着光
+        vec3 tint = pal < .5 ? vec3(.55, .85, 1.) : vec3(1., .78, .88);
+        float s = fbm(q * 3. + vec2(uTime * .3, vSeed * 9.));
+        c += tint * (exp(-r2 * 6.) * .45 + s * s * smoothstep(1., .2, r) * .35) * uLit + vec3(.95) * exp(-r2 * 30.) * .35 * uLit;
+      }
+      c = 1. - exp(-c * 1.25);
+      c *= smoothstep(1., .95, r) * vDim;                                         // 放大的泡泡变淡，叠在一起不过曝
+      c *= 1. - smoothstep(uFog.x, uFog.y, vDepth) * .92;
+      gl_FragColor = vec4(c, 1.);
+      #include <colorspace_fragment>
+    }`
+});
+const mesh = new THREE.InstancedMesh(geo, mat, ALL);
+mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; scene.add(mesh);
+const dimColor = new THREE.Color();
+for (let i = 0; i < ALL; i++) mesh.setColorAt(i, dimColor.setRGB(1, 1, 1));
+mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+
+/* ============================================================
+   6. 泡沫转场：独立的全屏 WebGL 画布，规则蜂窝泡沫从点击处铺开
+   ============================================================ */
+const foamCv = document.getElementById('foam');
+const fg = foamCv.getContext('webgl', { premultipliedAlpha: true, alpha: true });
+const FOAM_FS = `precision highp float;uniform vec2 R,Cc;uniform float T,P,Pal;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*n(p);p*=2.;a*=.5;}return v;}
+${THINFILM}
+float hd(vec2 g){g=abs(g);return max(dot(g,normalize(vec2(1.,1.7320508))),g.x);}
+void main(){vec2 uv=(gl_FragCoord.xy*2.-R)/R.y;vec2 cc=(Cc*2.-R)/R.y;float d=length(uv-cc);
+ float rad=P*2.6,m=smoothstep(rad,rad-.35,d);if(m<=0.){gl_FragColor=vec4(0.);return;}
+ vec2 p=(uv-cc)*mix(1.3,3.,P)+vec2(T*.05,T*.03);p+=.07*vec2(sin(p.y*2.+T*.7),cos(p.x*2.-T*.6));
+ vec2 s=vec2(1.,1.7320508),hh=s*.5;vec2 a=mod(p,s)-hh,b=mod(p-hh,s)-hh;vec2 g=dot(a,a)<dot(b,b)?a:b;vec2 id=p-g;
+ float r=hd(g)/.5;vec3 nn=normalize(vec3(g/.5,sqrt(max(1.-r*r,0.))));
+ vec3 fc=1.-exp(-bubbleShade(nn,h(id),T,Pal)*1.2);
+ vec3 col=vec3(.02,.025,.04)+fc*.5;
+ col=mix(col,fc,smoothstep(.8,1.,r)*.5);
+ col+=vec3(1.,.85,.7)*exp(-abs(d-rad+.18)*14.)*.5*(1.-P);
+ float a2=m*.94;gl_FragColor=vec4(col*a2,a2);}`;
+let foamDraw = null;
+if (fg) {
+  const mk = (t, s) => { const o = fg.createShader(t); fg.shaderSource(o, s); fg.compileShader(o); return o; };
+  const pr = fg.createProgram(); fg.attachShader(pr, mk(fg.VERTEX_SHADER, 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'));
+  fg.attachShader(pr, mk(fg.FRAGMENT_SHADER, FOAM_FS)); fg.linkProgram(pr); fg.useProgram(pr);
+  const buf = fg.createBuffer(); fg.bindBuffer(fg.ARRAY_BUFFER, buf); fg.bufferData(fg.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), fg.STATIC_DRAW);
+  const loc = fg.getAttribLocation(pr, 'p'); fg.enableVertexAttribArray(loc); fg.vertexAttribPointer(loc, 2, fg.FLOAT, false, 0, 0);
+  const U = k => fg.getUniformLocation(pr, k), uR = U('R'), uC = U('Cc'), uT = U('T'), uP = U('P'), uPal = U('Pal');
+  foamDraw = (t, p, cx, cy) => {
+    const dpr = Math.min(devicePixelRatio, 1.5), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+    if (foamCv.width !== w || foamCv.height !== h) { foamCv.width = w; foamCv.height = h; }
+    fg.viewport(0, 0, w, h); fg.clearColor(0, 0, 0, 0); fg.clear(fg.COLOR_BUFFER_BIT);
+    fg.uniform2f(uR, w, h); fg.uniform2f(uC, cx * dpr, h - cy * dpr); fg.uniform1f(uT, t); fg.uniform1f(uP, p); fg.uniform1f(uPal, mat.uniforms.uPal.value > 1.5 ? 1 : mat.uniforms.uPal.value); fg.drawArrays(fg.TRIANGLES, 0, 3);
+  };
+}
+
+/* ============================================================
+   7. 状态
+   ============================================================ */
+let pathIndex = CONFIG.START_PATH, curve = curves[pathIndex], prevCurve = null, morphStart = 0, morphE = 1;
+let targetT = 0, camT = 0, auto = false, flow = 0;
+let overview = CONFIG.START_IN_OVERVIEW, ov = overview ? 1 : 0, ovPose = null;
+let openK = -1, foamP = 0, foamTarget = 0, foamAt = [innerWidth / 2, innerHeight / 2];
+const camPos = new THREE.Vector3(), camTarget = new THREE.Vector3(), pA = new THREE.Vector3(), pB = new THREE.Vector3();
+const easeInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const damp = (cur, target, seconds, dt) => cur + (target - cur) * (1 - Math.exp(-dt * 3 / seconds));
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const hint = document.getElementById('hint'), ovBtn = document.getElementById('overview');
+function overviewPose(c) {
+  const box = new THREE.Box3().setFromPoints(c.getPoints(400));
+  const ctr = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+  const half = Math.max(s.y / 2, s.x / 2 / camera.aspect) * CONFIG.OVERVIEW_MARGIN + 1.5;
+  return new THREE.Vector3(ctr.x, ctr.y, box.max.z + half / Math.tan(THREE.MathUtils.degToRad(CONFIG.FOV / 2)));
+}
+function setOverview(on) {
+  overview = on; ovBtn.setAttribute('aria-pressed', on);
+  hint.textContent = on ? '点击轨迹进入 · 点亮着的泡泡打开内容' : '滚动、拖动或方向键前进 · Esc 返回总览';
+}
+setOverview(overview);
+
+/* 内容标签：跟着内容泡泡走的 HTML 文字 */
+const labelBox = document.getElementById('labels');
+const labels = CONTENT.map(c => { const d = document.createElement('div'); d.className = 'lbl';
+  d.innerHTML = '<b></b><span></span>'; d.querySelector('b').textContent = c.title; d.querySelector('span').textContent = c.url ? c.sub : c.sub + ' · 即将上线';
+  labelBox.appendChild(d); return d; });
+
+/* 内容面板 */
+const panel = document.getElementById('panel');
+function openContent(k, x, y) {
+  openK = k; foamAt = [x, y]; foamTarget = 1; if (reduceMotion) foamP = 1;
+  const c = CONTENT[k];
+  document.getElementById('pKey').textContent = c.key + ' · ' + c.sub;
+  document.getElementById('pTitle').textContent = c.title;
+  document.getElementById('pDesc').textContent = c.desc;
+  const row = document.getElementById('pRow'); row.innerHTML = '';
+  if (c.url) { const a = document.createElement('a'); a.className = 'go'; a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '打开页面 ↗'; row.appendChild(a); }
+  else { const s = document.createElement('span'); s.className = 'soon'; s.textContent = '即将上线'; row.appendChild(s); }
+  const b = document.createElement('button'); b.className = 'btn'; b.textContent = '返回画廊'; b.onclick = closeContent; row.appendChild(b);
+  foamCv.style.display = 'block'; foamCv.style.pointerEvents = 'auto';
+  setTimeout(() => { if (openK === k) { panel.style.display = 'grid'; requestAnimationFrame(() => panel.classList.add('show')); b.focus(); } }, reduceMotion ? 0 : CONFIG.FOAM_TIME * 550);
+}
+function closeContent() {
+  if (openK < 0) return; openK = -1; foamTarget = 0; panel.classList.remove('show');
+  foamCv.style.pointerEvents = 'none'; setTimeout(() => { if (openK < 0) panel.style.display = 'none'; }, 400);
+}
+foamCv.addEventListener('click', closeContent);
+
+/* ============================================================
+   8. 输入
+   ============================================================ */
+const sens = () => CONFIG.SENSITIVITY / (innerHeight * 4);
+const push = dy => { if (!auto && !overview && openK < 0) targetT += dy * sens(); };
+addEventListener('wheel', e => { e.preventDefault(); push(e.deltaY); }, { passive: false });
+let dragY = null, downAt = null;
+const stage = document.getElementById('stage');
+stage.addEventListener('pointerdown', e => { dragY = e.clientY; downAt = [e.clientX, e.clientY]; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => { if (dragY !== null) { push((dragY - e.clientY) * 2); dragY = e.clientY; } hover(e.clientX, e.clientY); });
+stage.addEventListener('pointerup', e => {
+  const moved = downAt ? Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) : 99; dragY = null; downAt = null;
+  if (moved < 6) clickAt(e.clientX, e.clientY);
+});
+const scr = new THREE.Vector3();
+function toScreen(v) { scr.copy(v).project(camera); return [(scr.x + 1) / 2 * innerWidth, (1 - scr.y) / 2 * innerHeight, scr.z]; }
+function screenRadius(b) { const d = camera.position.distanceTo(b.pos); return b.size * b.scale / 2 / (d * Math.tan(THREE.MathUtils.degToRad(CONFIG.FOV / 2))) * innerHeight / 2; }
+function contentAt(x, y) {
+  for (let k = 0; k < C; k++) { const b = bubbles[N + k], [sx, sy, sz] = toScreen(b.pos);
+    if (sz < 1 && Math.hypot(sx - x, sy - y) < Math.max(26, screenRadius(b))) return k; }
+  return -1;
+}
+function hover(x, y) { stage.style.cursor = contentAt(x, y) >= 0 ? 'pointer' : (overview ? 'zoom-in' : 'grab'); }
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), hit = new THREE.Vector3();
+function jumpTo(tt) { camT = targetT = curve.closed ? Math.round(camT) + (1 - tt) : tt; }
+function clickAt(x, y) {
+  if (openK >= 0) return;
+  const k = contentAt(x, y);
+  if (k >= 0) { const b = bubbles[N + k]; if (overview) { jumpTo(b.t0); setOverview(false); } openContent(k, x, y); return; }
+  if (!overview) return;
+  ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  if (!ray.ray.intersectPlane(plane, hit)) return;
+  let best = null, bd = Infinity;
+  for (let i = 0; i < N; i++) { const b = bubbles[i], d = Math.hypot(b.pos.x - hit.x, b.pos.y - hit.y); if (d < bd) { bd = d; best = b; } }
+  if (!best || bd > 4) return;
+  jumpTo((best.t0 + flow) % 1); setOverview(false);
+}
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (openK >= 0) closeContent(); else setOverview(true); return; }
+  if (openK >= 0) return;
+  if (e.key === 'Enter' && overview) { setOverview(false); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); push(innerHeight * .25); }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); push(-innerHeight * .25); }
+});
+ovBtn.addEventListener('click', () => { closeContent(); setOverview(!overview); });
+document.querySelectorAll('.sizes .btn').forEach(btn => btn.addEventListener('click', () => {
+  CONFIG.SIZE_MODE = +btn.dataset.size;
+  document.querySelectorAll('.sizes .btn').forEach(b => b.setAttribute('aria-pressed', b === btn));
+}));
+document.querySelectorAll('.pals .btn').forEach(btn => btn.addEventListener('click', () => {
+  mat.uniforms.uPal.value = +btn.dataset.pal;
+  document.querySelectorAll('.pals .btn').forEach(b => b.setAttribute('aria-pressed', b === btn));
+}));
+const modeBtn = document.getElementById('mode');
+modeBtn.addEventListener('click', () => { auto = !auto; modeBtn.textContent = auto ? 'Auto' : 'Scroll'; modeBtn.setAttribute('aria-pressed', auto); if (auto) setOverview(false); });
+document.querySelectorAll('.paths .btn').forEach(btn => btn.addEventListener('click', () => {
+  const i = +btn.dataset.path; if (i === pathIndex) return;
+  document.querySelectorAll('.paths .btn').forEach(b => b.setAttribute('aria-pressed', b === btn));
+  prevCurve = curve; pathIndex = i; curve = curves[i]; ovPose = null; morphStart = performance.now(); morphE = 0;
+}));
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); ovPose = null; });
+
+/* ============================================================
+   9. 每帧
+   ============================================================ */
+const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3();
+let sm = CONFIG.SIZE_MODE === 1 ? 1 : 0, se = CONFIG.SIZE_MODE === 2 ? 1 : 0;   // sm：B↔C 混合；se：疏朗模式权重
+function bubbleSize(b, tt) {                        // 泡泡直径：B 统一放大，C 沿路径渐大渐小（节奏固定在空间里，泡泡流过时依次胀缩）
+  if (b.kind) return b.size;
+  const bold = CONFIG.BOLD.d * b.rB;
+  const P = CONFIG.PEARL, wave = .5 + .5 * Math.sin(tt * TAU * P.waves);
+  const pearl = P.d * (P.min + (P.max - P.min) * wave) * b.rC;
+  const chain = bold + (pearl - bold) * sm;
+  const airy = b.lead ? CONFIG.AIRY.d * b.rE : 0;     // 疏朗模式：只有「领头」的 150 颗保留，其余缩到 0
+  return chain + (airy - chain) * se;
+}
+const focusScale = d => { const f = 1 - d / CONFIG.FOCUS_DIST; return 1 + f * f * f * (CONFIG.MAX_SCALE - 1); };
+let last = performance.now(); const t0 = last;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; const T = Math.max(0, (now - t0) / 1000);
+  mat.uniforms.uTime.value = T;
+
+  if (!reduceMotion) flow = (flow + dt * CONFIG.FLOW_SPEED) % 1;
+  if (auto && !reduceMotion && !overview && openK < 0) targetT += dt / CONFIG.AUTO_LOOP_SECONDS;
+  const open = !curve.closed;                      // 开放曲线（单轨徽章）：镜头不绕圈，在两端停住
+  if (open) targetT = Math.min(1, Math.max(0, targetT));
+  camT = damp(camT, targetT, CONFIG.CAM_EASE, dt);
+  const t = open ? Math.min(1, Math.max(0, camT)) : ((1 - camT) % 1 + 1) % 1;
+
+  if (morphE < 1) { morphE = easeInOut(Math.min(1, (now - morphStart) / (CONFIG.MORPH_TIME * 1000))); if (morphE >= 1) prevCurve = null; }
+  const len = prevCurve ? lens[curves.indexOf(prevCurve)] + (lens[pathIndex] - lens[curves.indexOf(prevCurve)]) * morphE : lens[pathIndex];
+  const mode = CONFIG.SIZE_MODE;                   // 大小方案之间平滑过渡
+  if (mode !== 2) sm = reduceMotion ? mode : damp(sm, mode, 0.8, dt);
+  se = reduceMotion ? (mode === 2 ? 1 : 0) : damp(se, mode === 2 ? 1 : 0, 0.9, dt);
+
+  const at = (tt, lat, dep, out) => { placeOn(curve, tt, lat, dep, out); if (prevCurve) { placeOn(prevCurve, tt, lat, dep, pA); pB.copy(out); out.lerpVectors(pA, pB, morphE); } return out; };
+  at(t, 0, 0, camPos); camPos.z += CONFIG.CAM_Z;
+  if (!ovPose) ovPose = overviewPose(curve);
+  ov = reduceMotion ? (overview ? 1 : 0) : damp(ov, overview ? 1 : 0, CONFIG.OVERVIEW_EASE, dt);
+  const e = ov * ov * (3 - 2 * ov);
+  camera.position.lerpVectors(camPos, ovPose, e);
+  const ovD = ovPose.z;
+  mat.uniforms.uFog.value.set(CONFIG.FOG[0] + (ovD * .9 - CONFIG.FOG[0]) * e, CONFIG.FOG[1] + (ovD * 1.8 - CONFIG.FOG[1]) * e);
+
+  for (let i = 0; i < ALL; i++) {
+    const b = bubbles[i], base = b.kind ? b.t0 : b.t0 + (b.lead ? (b.tE - b.t0) * se : 0);
+    const tt = b.kind ? b.t0 : ((base + flow) % 1 + 1) % 1;
+    const lat = b.kind ? 0 : b.lat * (CONFIG.BOLD.lateral + (CONFIG.PEARL.lateral - CONFIG.BOLD.lateral) * sm) * (1 - se) + (b.sc || 0) * CONFIG.WOBBLE.scatter * se;
+    at(tt, lat, b.dep, b.pos);
+    if (!b.kind && !reduceMotion) {                  // 360° 随机晃动：每颗泡泡在 x/y/z 上各自用两组不同频率的正弦叠加漂移，轨迹像利萨如曲线，永不重复
+      const A = CONFIG.WOBBLE.amp * (.35 + .65 * se), f = b.wf, ph = b.wp;
+      b.pos.x += A * (.65 * Math.sin(T * f[0] + ph[0]) + .35 * Math.sin(T * f[1] * 1.73 + ph[3]));
+      b.pos.y += A * (.65 * Math.sin(T * f[1] + ph[1]) + .35 * Math.sin(T * f[2] * 1.41 + ph[4]));
+      b.pos.z += A * (CONFIG.WOBBLE.depth / CONFIG.WOBBLE.amp) * (.65 * Math.sin(T * f[2] + ph[2]) + .35 * Math.sin(T * f[0] * 1.29 + ph[5]));
+    }
+    const dx = camera.position.x - b.pos.x, dy = camera.position.y - b.pos.y, dz = Math.abs(camera.position.z - b.pos.z), dxy = Math.hypot(dx, dy);
+    let dT = Math.abs(tt - t); if (!open && dT > .5) dT = 1 - dT;
+    const inFocus = dT < CONFIG.FOCUS_DIST * 1.5 / len && dz < CONFIG.Z_GATE && dxy < CONFIG.FOCUS_DIST;
+    const target = (inFocus ? 1 + (focusScale(dxy) - 1) * (1 - e) * (b.kind ? .35 : 1) * (1 - .5 * se) : 1) * (b.kind ? 1 + .35 * e : 1);   // 疏朗模式泡泡本身已大，镜头前放大减半
+    b.scale = damp(b.scale, target, CONFIG.SCALE_EASE, dt);
+    let breath = 1 + CONFIG.BREATH * Math.sin(T * 1.3 + b.ph);
+    if (open && !b.kind) breath *= Math.min(1, tt / .02, (1 - tt) / .02);   // 开放曲线两端：泡泡在起点长出、在终点消失
+    const sz = bubbleSize(b, tt);
+    S.setScalar(sz * b.scale * breath); M.compose(b.pos, Q, S); mesh.setMatrixAt(i, M);
+    const spacing = len / (N + (CONFIG.AIRY.count - N) * se);
+    const density = b.kind ? 1 : Math.min(1, Math.max(.3, spacing / Math.max(sz * .5, 1e-3)));   // 重叠越多，单颗越淡，叠加后总亮度保持柔和
+    const dim = density / (1 + (b.scale - 1) * 1.4); mesh.setColorAt(i, dimColor.setRGB(dim, dim, dim));
+  }
+  mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
+
+  for (let k = 0; k < C; k++) {                       // 标签：总览时全部显示，漫游时只显示附近的
+    const b = bubbles[N + k], [sx, sy, sz] = toScreen(b.pos), near = Math.hypot(camera.position.x - b.pos.x, camera.position.y - b.pos.y) < 7;
+    const show = sz < 1 && openK < 0 && (overview || near);
+    labels[k].style.opacity = show ? 1 : 0;
+    labels[k].style.transform = `translate(${sx}px, ${sy + screenRadius(b) + 6}px) translate(-50%, 0)`;
+  }
+
+  foamP = reduceMotion ? foamTarget : damp(foamP, foamTarget, CONFIG.FOAM_TIME, dt);
+  if (foamDraw && foamP > .002) foamDraw(T, foamP, foamAt[0], foamAt[1]);
+  else if (foamP <= .002 && foamTarget === 0) foamCv.style.display = 'none';
+  mat.uniforms.uLit.value = 1;
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
