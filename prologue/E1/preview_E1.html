@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>preview · E1 地球辉光 v001</title>
+<style>
+  html,body{margin:0;background:#000;overflow:hidden;font:12px/1.4 system-ui,"Noto Sans CJK SC",sans-serif;color:#cfc6b8}
+  #stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+  canvas{display:block;width:1920px;height:1080px}
+  #slit{position:absolute;inset:0;pointer-events:none;display:none}
+  #ui{position:fixed;left:14px;top:12px;display:none;gap:6px;flex-wrap:wrap;max-width:560px;z-index:5}
+  #ui button{background:rgba(20,18,16,.75);color:#e8dfd0;border:1px solid #3a342c;border-radius:6px;padding:5px 10px;cursor:pointer;font:inherit}
+  #ui button.on{border-color:#dbc299;color:#fff3dc}
+  #ui label{display:flex;gap:6px;align-items:center;background:rgba(20,18,16,.6);padding:3px 8px;border-radius:6px}
+  #ui input[type=range]{width:110px}
+  #tag{position:fixed;right:16px;bottom:12px;opacity:.55;display:none}
+</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head><body>
+<div id="stage"><canvas id="c" width="1920" height="1080"></canvas><svg id="slit" viewBox="0 0 1920 1080"></svg></div>
+<div id="ui"></div><div id="tag">E1 · EarthGlow v001 · 拖拽旋转 · 滚轮缩放</div>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { rng, sstep, lerp, easeSine } from './shared.js';
+import * as E1 from './E1_EarthGlow_v001.js';
+
+const W = 1920, H = 1080, Q = new URLSearchParams(location.search), MODE = Q.get('mode') || (navigator.webdriver ? 'render' : 'live');
+const fovMM = mm => 2 * Math.atan(12 / mm) * 180 / Math.PI;
+
+// ── renderer + 后期（与主场景一致：ACES + bloom 0.8 + 颗粒 + 暗角）
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(35, W / H, 1, 60000);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, cam));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.8, 0.6, 0.55); composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const finish = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uSeed: { value: 0 }, uGrain: { value: 0.045 }, uVig: { value: 1.1 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSeed,uGrain,uVig; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233))+uSeed*7.13)*43758.5453); }
+    void main(){ vec4 c=texture2D(tDiffuse,vUv); float n=(h(vUv*vec2(1920.,1080.))+h(vUv*vec2(1920.,1080.)+3.1))*.5-.5;
+      float lum=dot(c.rgb,vec3(.3,.59,.11)); c.rgb+=n*uGrain*(0.35+0.65*(1.-lum));
+      vec2 q=vUv-.5; q.x*=1.2; c.rgb*=clamp(1.-dot(q,q)*uVig,0.,1.); gl_FragColor=vec4(max(c.rgb,0.),1.); }`,
+});
+composer.addPass(finish);
+
+// ── 预览用星空（不属于 E1，只为看清地球盘遮挡关系）
+{
+  const r = rng(7), n = 5000, R = 30000, pos = new Float32Array(n * 3), mag = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const u = r() * 2 - 1, th = r() * 6.2832, s = Math.sqrt(1 - u * u); pos.set([R * s * Math.cos(th), R * u, R * s * Math.sin(th)], i * 3); mag[i] = Math.pow(r(), 9); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aMag', new THREE.BufferAttribute(mag, 1));
+  const m = new THREE.ShaderMaterial({ vertexShader: `attribute float aMag; varying float vM; void main(){ gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); gl_PointSize=1.5+aMag*3.; vM=aMag; }`,
+    fragmentShader: `varying float vM; void main(){ float d=length(gl_PointCoord-.5)*2.; float a=smoothstep(1.,0.,d); gl_FragColor=vec4(vec3(1.,.95,.88)*(0.03+vM*1.8)*a*a,1.); }`,
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+  const stars = new THREE.Points(g, m); stars.renderOrder = -10; stars.frustumCulled = false;
+  stars.onBeforeRender = (r2, s2, c2) => { stars.position.copy(c2.position); stars.updateMatrixWorld(); };
+  scene.add(stars);
+}
+
+// ── E1
+const earth = E1.create();
+scene.add(earth.object3d);
+const P = earth.params, CEN = P.center, R = P.R;
+
+// ── 机位预设：每镜只改相机 + 太阳方向 + 少量增益（地球本身同一套参数）
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const dirAzEl = (az, el, fwd) => { // 以相机水平前方为 0°，右为正；el 为仰角（度）
+  const f = fwd.clone().setY(0).normalize(), r = V(-f.z, 0, f.x);
+  const a = THREE.MathUtils.degToRad(az), e = THREE.MathUtils.degToRad(el);
+  return f.multiplyScalar(Math.cos(a) * Math.cos(e)).add(r.multiplyScalar(Math.sin(a) * Math.cos(e))).add(V(0, Math.sin(e), 0)).normalize();
+};
+const SHOTS = {
+  S1: { // 整颗剪影 · 太阳在正后方 → 细光环 + 前向亮点（R4）
+    mm: 35, pos: (k) => V(lerp(-200, -140, k), CEN.y + 250, 5600), tgt: () => V(0, CEN.y + R * 0.55, 0),
+    sun: (c) => earth.sunBehindLimb(c, V(-0.55, 1, 0), Math.asin(R / c.distanceTo(CEN)) * 0.975),
+    p: { limbWidth: 1.25, haloSize: 1.2, haloGain: 0.35, glowGain: 1.3, mieGain: 0.55, dayAmount: 0.0, exposure: 1.0 }, slit: false,
+  },
+  S2: { // 大弧 · 太阳在侧后方、刚落到地平线下 → 分层（R2）
+    mm: 28, pos: (k) => V(lerp(0, 14, k), 108, lerp(0, -10, k)), tgt: (c) => c.clone().add(dirAzEl(0, -16, V(0, 0, -1))),
+    sun: (c) => dirAzEl(48, -24.5, V(0, 0, -1)),
+    p: { limbWidth: 1.0, haloSize: 0.8, haloGain: 0.3, glowGain: 1.0, mieGain: 0.55, dayAmount: 0.35, exposure: 1.0 }, slit: false,
+  },
+  S3: { // 船底窄缝 · 同 S2 光照，长焦，透过缝看到一条分层细线
+    mm: 50, pos: (k) => V(0, 108, lerp(0, -6, k)), tgt: (c) => c.clone().add(dirAzEl(-6, -25.4, V(0, 0, -1))),
+    sun: (c) => dirAzEl(40, -24.0, V(0, 0, -1)),
+    p: { limbWidth: 1.0, haloSize: 1.0, haloGain: 0.6, glowGain: 1.0, mieGain: 0.55, dayAmount: 0.35, exposure: 1.15 }, slit: true,
+  },
+  S5: { // 雾海下的亮弧 · 太阳在左侧、刚落到地平线后 → 分层亮弧 + 宽柔晕（R1 R2）
+    mm: 35, pos: (k) => V(lerp(-20, -6, k), 18, 0), tgt: (c) => c.clone().add(dirAzEl(-22, -11.5, V(0, 0, -1))),
+    sun: (c) => dirAzEl(-65, -19.5, V(0, 0, -1)),
+    p: { limbWidth: 1.0, haloSize: 1.8, haloGain: 0.6, glowGain: 1.0, mieGain: 0.55, dayAmount: 0.55, exposure: 1.0 }, slit: false,
+  },
+  S5alt: { // 备选：镜头正对太阳落下的位置 → 日出式亮点
+    mm: 35, pos: (k) => V(lerp(-20, -6, k), 18, 0), tgt: (c) => c.clone().add(dirAzEl(-65, -16, V(0, 0, -1))),
+    sun: (c) => dirAzEl(-65, -19.5, V(0, 0, -1)),
+    p: { limbWidth: 1.0, haloSize: 1.8, haloGain: 0.6, glowGain: 1.0, mieGain: 0.55, dayAmount: 0.55, exposure: 1.0 }, slit: false,
+  },
+};
+const ORDER = ['S1', 'S2', 'S3', 'S5'], SEG = 5, DURATION = ORDER.length * SEG;
+
+// ── S3 的船底窄缝遮罩（只在预览里模拟主场景的透光缝）
+const slit = document.getElementById('slit');
+slit.innerHTML = `<defs><mask id="m"><rect width="1920" height="1080" fill="white"/><rect x="${960 - 60}" y="0" width="120" height="1080" fill="black"/></mask></defs>
+  <rect width="1920" height="1080" fill="#050403" mask="url(#m)"/>
+  <rect x="${960 - 61}" y="0" width="1.5" height="1080" fill="#dbc299" opacity=".35"/><rect x="${960 + 59.5}" y="0" width="1.5" height="1080" fill="#dbc299" opacity=".35"/>`;
+
+let cur = 'S1', live = null;
+function applyShot(id, k, t) {
+  const s = SHOTS[id];
+  cam.fov = fovMM(s.mm); cam.updateProjectionMatrix();
+  if (!live || live.shot !== id) { cam.position.copy(s.pos(k)); cam.lookAt(s.tgt(cam.position)); }
+  earth.update(t, { ...s.p, sunDir: s.sun(cam.position) });
+  slit.style.display = s.slit ? 'block' : 'none';
+}
+function frame(t) {
+  t = Math.min(Math.max(t, 0), DURATION - 1e-4);
+  const i = Math.floor(t / SEG), id = ORDER[i], L = t - i * SEG;
+  applyShot(id, easeSine(L / SEG), t);
+  finish.uniforms.uSeed.value = Math.floor(t * 24) * 0.618;
+  composer.render();
+}
+window.DURATION = DURATION; window.SHOTS = ORDER;
+window.seek = async t => { frame(t); return true; };
+window.shot = async (id, k = 0.5) => { applyShot(id, k, 0); finish.uniforms.uSeed.value = 1; composer.render(); return true; };
+window.__ready = true;
+
+// ── 交互模式：?mode=live
+if (MODE === 'live') {
+  const fit = () => { const s = Math.min(innerWidth / W, innerHeight / H); document.getElementById('stage').style.transform = `translate(${(innerWidth - W * s) / 2}px,${(innerHeight - H * s) / 2}px) scale(${s})`; };
+  addEventListener('resize', fit); fit();
+  const ui = document.getElementById('ui'); ui.style.display = 'flex'; document.getElementById('tag').style.display = 'block';
+  const ctr = new OrbitControls(cam, document.getElementById('c')); ctr.enableDamping = true; ctr.dampingFactor = 0.08;
+  let sunFixed = null;
+  const go = id => { cur = id; live = null; applyShot(id, 0.5, 0); const s = SHOTS[id]; sunFixed = s.sun(cam.position).clone();
+    ctr.target.copy(s.tgt(cam.position)); ctr.update(); live = { shot: id };
+    ui.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.textContent === id)); };
+  [...ORDER,'S5alt'].forEach(id => { const b = document.createElement('button'); b.textContent = id; b.onclick = () => { go(id); try { history.replaceState(null, '', '#' + id); } catch (e) {} }; ui.appendChild(b); });
+  const sl = (name, key, min, max, step) => { const l = document.createElement('label'); l.innerHTML = `${name}<input type=range min=${min} max=${max} step=${step} value=${P[key]}>`;
+    const inp = l.querySelector('input'); inp.oninput = () => { SHOTS[cur].p[key] = +inp.value; }; ui.appendChild(l); return inp; };
+  sl('tint', 'tint', 0, 1, 0.01); sl('厚度', 'limbWidth', 0.4, 3, 0.01); sl('增益', 'glowGain', 0, 3, 0.01); sl('远晕', 'haloSize', 0, 4, 0.01); sl('云', 'cloudAmount', 0, 1, 0.01);
+  Object.values(SHOTS).forEach(s => { s.p.tint ??= 0.5; s.p.cloudAmount ??= 0.8; });
+  go(Q.get('shot') || (SHOTS[location.hash.slice(1)] ? location.hash.slice(1) : 'S5'));
+  addEventListener('hashchange', () => { const h = location.hash.slice(1); if (SHOTS[h]) go(h); });
+  const t0 = performance.now();
+  const loop = () => { ctr.update(); const t = (performance.now() - t0) / 1000;
+    earth.update(t, { ...SHOTS[cur].p, sunDir: sunFixed });
+    finish.uniforms.uSeed.value = Math.floor(t * 24) * 0.618; composer.render(); requestAnimationFrame(loop); };
+  loop();
+} else if (Q.has('t')) frame(parseFloat(Q.get('t')));
+</script></body></html>
