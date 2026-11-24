@@ -10,3 +10,10 @@
 技术：单球壳 BackSide 解析求交 → 完美轮廓；Rayleigh λ⁻⁴ + Mie HG 单次散射，向切点加密采样（24×6 步，GPU；无 GPU 可传 `{steps:12,sunSteps:4}`）；太阳衰减自然泛红；tint 只降偏冷成分的饱和度（C 方案 = 0.5）。城市光默认 0（一万年前）。
 
 交互预览：https://claude.ai/artifact/93ifbtHnYeSCrJ4KJFX6sK
+
+## v002（2026-11-24）— 地球特有的蓝（参考 R3 夜面图）
+- 新增：臭氧吸收（Chappuis 带）、多次散射「天空蓝」近似（`multiScatter`）、月光照亮的夜面云（`moonDir` / `moonIntensity`）、域扭曲云层、成簇城市光（`cityAmount`，默认 0）、蓝色远晕（`haloBlue`）
+- 三个版本（`preview_E1_v002.html` 的 VARIANTS，浏览器里有切换按钮）：A 真实蓝 · B 深蓝 · C 蓝+暖芯
+- 新增 REF 机位：复刻 R3 构图（高处俯看夜面，地球边缘竖在左侧）
+- 对比总表：`shots/E1_v002_三版本对比.jpg`
+- 交互预览：https://claude.ai/artifact/BfdSjD9ZUpbJ2VVRbLfvAq

@@ -16,9 +16,9 @@ with sync_playwright() as p:
         f = ROOT/'node_modules/three'/route.request.url[len(CDN):]
         route.fulfill(path=str(f), content_type='application/javascript')
     pg.route(CDN+'**', serve)
-    pg.goto((ROOT/'preview_E1.html').as_uri())
+    pg.goto((ROOT/(sys.argv[4] if len(sys.argv)>4 else 'preview_E1.html')).as_uri())
     pg.wait_for_function('window.__ready', timeout=30000)
     for s in shots:
-        pg.evaluate(f'window.shot("{s}",0.5)')
+        pg.evaluate(f'window.shot("{s}",0.5,"{sys.argv[3] if len(sys.argv)>3 else ""}")')
         pg.screenshot(path=str(out/f'{tag}_{s}.jpg'), type='jpeg', quality=92); print('shot', s)
     br.close()
