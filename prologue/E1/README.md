@@ -16,4 +16,4 @@
 - 三个版本（`preview_E1_v002.html` 的 VARIANTS，浏览器里有切换按钮）：A 真实蓝 · B 深蓝 · C 蓝+暖芯
 - 新增 REF 机位：复刻 R3 构图（高处俯看夜面，地球边缘竖在左侧）
 - 对比总表：`shots/E1_v002_三版本对比.jpg`
-- 交互预览：https://claude.ai/artifact/BfdSjD9ZUpbJ2VVRbLfvAq
+- 交互预览：https://claude.ai/artifact/UdCUuuLm49EMvbNbLqgkHa
