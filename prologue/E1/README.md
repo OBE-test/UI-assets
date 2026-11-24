@@ -17,3 +17,12 @@
 - 新增 REF 机位：复刻 R3 构图（高处俯看夜面，地球边缘竖在左侧）
 - 对比总表：`shots/E1_v002_三版本对比.jpg`
 - 交互预览：https://claude.ai/artifact/UdCUuuLm49EMvbNbLqgkHa
+
+## v004（2026-11-25）— 纹理重做（基于主对话的 v003）
+- 保留 v003：夜面边缘光带（lineGain）、夜面大气纱（veil）
+- 梯度噪声（quintic Perlin）替代 value noise；按像素尺寸自动淡出高频（fwidth LOD）→ 近看锐利、远看不闪
+- 云：大尺度云系 + 5 个气旋涡旋 + 纬向拉伸 + 积云团块 + 卷云丝；`cloudCover` 云量、`cloudSharp` 边缘锐度、`cloudRelief` 明暗起伏（沿光照方向差分）
+- 大陆：域扭曲梯度 fbm，海岸线清晰；`glint` 海面月光 / 日光高光
+- 多次散射在地表方向压到 0.35，日面不再被蓝雾盖住
+- 新机位：TEX（低空看夜面云）、DAY（日面近景）
+- 对比：`shots/E1_v004_前后对比.jpg`；交互预览：https://claude.ai/artifact/MrspgKBE6v2MCM7w7gNETT
