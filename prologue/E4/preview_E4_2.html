@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>preview · E4.2 身体 v001 · 参考复刻 R1–R7</title>
+<style>
+  html,body{margin:0;background:#000;overflow:hidden;font:12px/1.4 system-ui,"Noto Sans CJK SC",sans-serif;color:#cfc6b8}
+  #stage{position:absolute;left:0;top:0;transform-origin:0 0}
+  canvas{display:block}
+  #ui{position:fixed;left:12px;top:10px;display:none;gap:6px;flex-wrap:wrap;max-width:440px;z-index:5}
+  #ui button{background:rgba(20,18,16,.75);color:#e8dfd0;border:1px solid #3a342c;border-radius:6px;padding:5px 10px;cursor:pointer;font:inherit}
+  #ui button.on{border-color:#dbc299;color:#fff3dc}
+  #ui label{display:flex;gap:6px;align-items:center;background:rgba(20,18,16,.6);padding:3px 8px;border-radius:6px}
+  #ui input[type=range]{width:120px}
+</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head><body>
+<div id="stage"><canvas id="c"></canvas></div><div id="ui"></div>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { sstep, lerp, easeSine } from './shared.js';
+import * as E42 from './E4_2_Body_v001.js';
+
+const Q = new URLSearchParams(location.search);
+const W = +(Q.get('w') || 1080), H = +(Q.get('h') || 1620);
+const MODE = Q.get('mode') || (navigator.webdriver ? 'render' : 'live');
+const fovMM = mm => 2 * Math.atan(12 / mm) * 180 / Math.PI;
+const V = (x, y, z) => new THREE.Vector3(x, y, z), C = h => new THREE.Color(h);
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(35, W / H, 0.05, 200);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, cam));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 1.0, 0.6, 0.2); composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const finish = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uSeed: { value: 0 }, uGrain: { value: 0.04 }, uVig: { value: 1.1 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSeed,uGrain,uVig; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233))+uSeed*7.13)*43758.5453); }
+    void main(){ vec4 c=texture2D(tDiffuse,vUv); float n=(h(vUv*vec2(1080.,1620.))+h(vUv*vec2(1080.,1620.)+3.1))*.5-.5;
+      float lum=dot(c.rgb,vec3(.3,.59,.11)); c.rgb+=n*uGrain*(0.35+0.65*(1.-lum));
+      vec2 q=vUv-.5; c.rgb*=clamp(1.-dot(q,q)*uVig,0.,1.); gl_FragColor=vec4(max(c.rgb,0.),1.); }`,
+});
+composer.addPass(finish);
+
+// ── 背景（每个 look 自己的底色：中心色 → 边缘色）
+const bgU = { uA: { value: C('#000') }, uB: { value: C('#000') }, uCtr: { value: new THREE.Vector2(0.5, 0.55) } };
+const bg = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  uniforms: bgU, depthTest: false, depthWrite: false,
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.9999,1.); }`,
+  fragmentShader: `uniform vec3 uA,uB; uniform vec2 uCtr; varying vec2 vUv; void main(){ vec2 d=(vUv-uCtr)*vec2(1.,1.5); gl_FragColor=vec4(mix(uA,uB,smoothstep(0.,0.9,length(d))),1.); }`,
+}));
+bg.frustumCulled = false; bg.renderOrder = -100; scene.add(bg);
+
+// ── 7 张参考图的复刻配方
+const OFF = { form: 1, condense: 0, ring: 0, colPhase: 0, column: 0, burst: 0, shell: 0, grow: 0, net: 0, fiber: 0, limbGrow: 0, limb: 0, particles: 0, rimOnly: 0, drift: 0, silk: 1, chestGlow: 0.6, chestSize: 1, shellTint: null };
+const LOOKS = {
+  R1: { title: '1 暖金光尘 + 光环', mm: 40, pos: V(0.25, 1.15, -4.4), tgt: V(0, 0.98, 0), bg: ['#140b05', '#020101'], bloom: [1.25, 0.75, 0.12],
+        p: { ...OFF, hue: 0, particles: 1.1, drift: 1.6, ring: 0.8, chestGlow: 0.6, particleSize: 1.4 } },
+  R2: { title: '2 电光蓝光尘 + 光环', mm: 40, pos: V(0.25, 1.15, -4.4), tgt: V(0, 0.98, 0), bg: ['#02040c', '#000002'], bloom: [1.35, 0.75, 0.12],
+        p: { ...OFF, hue: 1, particles: 1.1, drift: 1.6, ring: 0.8, chestGlow: 0.6, particleSize: 1.2 } },
+  R3: { title: '3 光谱光柱贯穿', mm: 35, pos: V(0, 1.0, -8.0), tgt: V(0, 1.3, 0), bg: ['#0a1612', '#020504'], bloom: [1.4, 0.8, 0.1],
+        p: { ...OFF, hue: 0.05, particles: 4.0, rimOnly: 1, particleSize: 1.3, column: 0.55, colPhase: 1, chestGlow: 0.8 } },
+  R4: { title: '4 胸口色散爆发', mm: 35, pos: V(0.1, 1.2, -3.6), tgt: V(0, 1.12, 0), bg: ['#04040a', '#000000'], bloom: [0.9, 0.55, 0.22],
+        p: { ...OFF, hue: 0.8, particles: 0.8, particleSize: 1.0, shell: 0.8, silk: 0.3, burst: 0.8, chestGlow: 1.0, chestSize: 1.1 } },
+  R5: { title: '5 烟雾外壳 + 血管网', mm: 40, pos: V(0.05, 1.33, -2.15), tgt: V(0, 1.22, 0), bg: ['#0b0c0d', '#020202'], bloom: [0.9, 0.5, 0.25], density: 1.8,
+        p: { ...OFF, hue: 1, shell: 1.6, silk: 2.2, shellTint: C('#d8dde4'), grow: 1, net: 1.1, chestGlow: 1.0, netCyan: C('#4fd2ff'), netWarm: C('#ff7a3d') } },
+  R6: { title: '6 蓝色神经系统（背面）', mm: 40, pos: V(0, 1.18, 2.9), tgt: V(0, 1.12, 0), bg: ['#030a1a', '#00020a'], bloom: [0.85, 0.5, 0.25], density: 2.6,
+        p: { ...OFF, hue: 1, shell: 0.55, silk: 0.5, shellTint: C('#5b9bff'), grow: 1, net: 0.6, chestGlow: 0.0, netCyan: C('#6fc4ff'), netWarm: C('#6fc4ff') } },
+  R7: { title: '7 光纤身体 + 光枝（过场）', mm: 28, pos: V(-0.6, 0.95, -1.45), tgt: V(0.05, 1.33, 0), bg: ['#0d1a26', '#03070c'], bloom: [0.9, 0.55, 0.2], fibers: 1200,
+        p: { ...OFF, hue: 1, shell: 0.18, silk: 0.8, shellTint: C('#7fb3d8'), fiber: 0.32, limbGrow: 1, limb: 0.9, grow: 1, net: 0.0, chestGlow: 0.9 } },
+};
+const ORDER = Object.keys(LOOKS), SEG = 4, DURATION = ORDER.length * SEG;
+
+let body = null, bodyKey = '';
+function ensureBody(L) {
+  const key = (L.density || 1) + '/' + (L.fibers || 900);
+  if (key === bodyKey) return;
+  if (body) { scene.remove(body.object3d); body.dispose(); }
+  body = E42.create({ netDensity: L.density || 1, fiberCount: L.fibers || 900 });
+  scene.add(body.object3d); bodyKey = key;
+}
+let cur = null, live = false;
+function applyLook(id, k, t) {
+  const L = LOOKS[id]; ensureBody(L);
+  cam.fov = fovMM(L.mm); cam.aspect = W / H; cam.updateProjectionMatrix();
+  if (!live || cur !== id) {
+    // 轻微推镜：k 0→1
+    cam.position.copy(L.pos).lerp(L.tgt, 0.04 * k); cam.lookAt(L.tgt);
+  }
+  bgU.uA.value.set(L.bg[0]); bgU.uB.value.set(L.bg[1]);
+  [bloom.strength, bloom.radius, bloom.threshold] = L.bloom;
+  body.setPixelScale(H / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2)));
+  body.update(t, { stage: 4, ...L.p });
+  cur = id;
+}
+function frame(t) {
+  t = Math.min(Math.max(t, 0), DURATION - 1e-4);
+  const i = Math.floor(t / SEG), L = t - i * SEG;
+  applyLook(ORDER[i], easeSine(L / SEG), t);
+  finish.uniforms.uSeed.value = Math.floor(t * 24) * 0.618;
+  composer.render();
+}
+window.DURATION = DURATION; window.LOOKS = LOOKS; window.ORDER = ORDER;
+window.seek = async t => { frame(t); return true; };
+window.look = async (id, t = 2) => { applyLook(id, 0.5, t); finish.uniforms.uSeed.value = 1; composer.render(); return true; };
+window.__ready = true;
+
+if (MODE === 'live') {
+  const fit = () => { const s = Math.min(innerWidth / W, innerHeight / H); const st = document.getElementById('stage'); st.style.transform = `translate(${(innerWidth - W * s) / 2}px,${(innerHeight - H * s) / 2}px) scale(${s})`; };
+  addEventListener('resize', fit); fit();
+  const ui = document.getElementById('ui'); ui.style.display = 'flex';
+  const ctr = new OrbitControls(cam, canvas); ctr.enableDamping = true;
+  const go = id => { live = false; applyLook(id, 0.5, 0); live = true; ctr.target.copy(LOOKS[id].tgt); ctr.update();
+    ui.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.id === id)); try { history.replaceState(null, '', '#' + id); } catch (e) {} };
+  ORDER.forEach(id => { const b = document.createElement('button'); b.textContent = LOOKS[id].title; b.dataset.id = id; b.onclick = () => go(id); ui.appendChild(b); });
+  go(LOOKS[location.hash.slice(1)] ? location.hash.slice(1) : 'R1');
+  const t0 = performance.now();
+  const loop = () => { ctr.update(); const t = (performance.now() - t0) / 1000; applyLook(cur, 0.5, t); finish.uniforms.uSeed.value = Math.floor(t * 24) * 0.618; composer.render(); requestAnimationFrame(loop); };
+  loop();
+}
+</script></body></html>
